@@ -175,6 +175,9 @@ Exigem token: sem token, `401`; com token sem a role exigida, `403`. Dono, estad
 |---|---|---|---|
 | POST | `/api/expenses` | Employee | Cria um rascunho (`Draft`) do usuário autenticado; responde `201` |
 | PUT | `/api/expenses/{id}` | Employee | Edita o próprio rascunho; responde `200` |
+| POST | `/api/expenses/{id}/submit` | Employee | Envia o próprio rascunho (`Draft` para `Submitted`); responde `200` |
+| GET | `/api/expenses` | Employee, Approver, Finance, Auditor | Lista os reembolsos visíveis, do mais recente para o mais antigo |
+| GET | `/api/expenses/{id}` | Employee, Approver, Finance, Auditor | Consulta um reembolso visível |
 
 ```http
 POST /api/expenses
@@ -187,7 +190,9 @@ Content-Type: application/json
 - **Validação (`400`):** descrição entre 10 e 500 caracteres; valor entre `0.01` e `2147483647`; data no formato `yyyy-MM-dd`, não futura em relação ao dia corrente em Brasília; `categoryId` opcional, mas precisa existir (1 Transporte, 2 Alimentação, 3 Hospedagem, 4 Outros).
 - **Campos do servidor:** qualquer campo além dos quatro acima, como `ownerId`, `status` ou `createdAtUtc`, é recusado com `400`.
 - **Edição:** o `PUT` envia o rascunho completo. Reembolso inexistente ou de outro usuário responde `404`; fora de `Draft`, `409`. Se nada mudar, responde `200` sem gravar histórico.
-- **Histórico:** a criação grava a ação `Created` e cada edição grava `Updated`, com as alterações no campo `Changes` no formato `campo: antes -> depois` (por exemplo `amount: 85.50 -> 171.00; categoryId: 1 -> null`). A alteração e o histórico são salvos na mesma operação.
+- **Visibilidade:** as roles acumulam e o resultado é a união dos escopos. Employee vê os próprios; Approver, os `Submitted`; Finance, os `Approved` e `Paid`; Auditor, todos. Admin sem outra role não tem acesso (`403`). O filtro é aplicado na consulta ao banco, e um reembolso fora do escopo responde `404`.
+- **Envio:** só o dono envia, e só em `Draft`. Reembolso fora do escopo responde `404`; visível mas de outra pessoa, `403`; fora de `Draft` ou já enviado, `409`. O estado é usado como token de concorrência: se duas operações alterarem o mesmo reembolso ao mesmo tempo, a segunda responde `409` e não grava histórico.
+- **Histórico:** a criação grava a ação `Created`, cada edição grava `Updated` e o envio grava `Submitted`. A edição registra as alterações no campo `Changes` no formato `campo: antes -> depois` (por exemplo `amount: 85.50 -> 171.00; categoryId: 1 -> null`). A alteração e o histórico são salvos na mesma operação.
 
 ## Testes
 

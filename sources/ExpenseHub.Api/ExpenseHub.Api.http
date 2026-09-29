@@ -128,3 +128,18 @@ Content-Type: application/json
   "expenseDate": "2026-09-20",
   "categoryId": 1
 }
+
+###
+
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/submit
+Authorization: Bearer {{userToken}}
+
+###
+
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{userToken}}
+
+###
+
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{userToken}}
