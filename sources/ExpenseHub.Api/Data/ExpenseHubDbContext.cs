@@ -25,6 +25,14 @@ public class ExpenseHubDbContext(DbContextOptions<ExpenseHubDbContext> options) 
     public DbSet<PaymentRecord> PaymentRecords => Set<PaymentRecord>();
 
     /// <inheritdoc />
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(configurationBuilder);
+
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+    }
+
+    /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -61,6 +69,7 @@ public class ExpenseHubDbContext(DbContextOptions<ExpenseHubDbContext> options) 
             entity.Property(h => h.PreviousStatus).HasConversion<string>().HasMaxLength(20);
             entity.Property(h => h.NewStatus).HasConversion<string>().HasMaxLength(20);
             entity.Property(h => h.Justification).HasMaxLength(ExpenseHistory.JustificationMaxLength);
+            entity.Property(h => h.Changes).HasMaxLength(ExpenseHistory.ChangesMaxLength);
             entity.HasOne<Expense>().WithMany().HasForeignKey(h => h.ExpenseId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<IdentityUser>().WithMany().HasForeignKey(h => h.ActorId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(h => h.ExpenseId);

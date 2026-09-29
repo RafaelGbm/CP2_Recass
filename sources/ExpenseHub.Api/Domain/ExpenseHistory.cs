@@ -13,6 +13,9 @@ public class ExpenseHistory
     /// <summary>Tamanho máximo da justificativa de reprovação.</summary>
     public const int JustificationMaxLength = 500;
 
+    /// <summary>Tamanho máximo da descrição das alterações feitas em Draft.</summary>
+    public const int ChangesMaxLength = 2000;
+
     /// <summary>Identificador do registro.</summary>
     public long Id { get; set; }
 
@@ -36,4 +39,7 @@ public class ExpenseHistory
 
     /// <summary>Justificativa, usada na reprovação.</summary>
     public string? Justification { get; set; }
+
+    /// <summary>Alterações realizadas enquanto o reembolso estava em Draft, usadas na edição.</summary>
+    public string? Changes { get; set; }
 }
