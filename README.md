@@ -23,7 +23,8 @@ sources/
 │   ├── Domain/        entidades e estados do reembolso
 │   ├── Dtos/          contratos de entrada e saída, com validação
 │   ├── Migrations/    migrations do Entity Framework Core
-│   └── Services/      regras de negócio usadas pelos controllers
+│   ├── Services/      regras de negócio usadas pelos controllers
+│   └── Validation/    atributos de validação próprios
 └── ExpenseHub.UnitTests/
 ```
 
@@ -123,6 +124,7 @@ Os erros usam `ProblemDetails`:
 | 401 | Sem token, token inválido, expirado ou emitido antes de uma alteração de roles; credenciais erradas no login |
 | 403 | Autenticado, mas sem permissão para a operação |
 | 404 | Recurso inexistente ou fora do escopo de leitura |
+| 409 | Transição de estado incompatível ou repetida |
 
 ## Cadastro e gerenciamento de roles
 
@@ -164,6 +166,28 @@ Content-Type: application/json
 - Usuário inexistente responde `404`.
 
 > **Novo login obrigatório:** depois de uma alteração de roles, os tokens emitidos antes dela passam a receber `401`. O usuário precisa fazer login de novo para receber um token com as roles atuais.
+
+## Reembolsos
+
+Exigem token: sem token, `401`; com token sem a role exigida, `403`. Dono, estado, ator e horários são sempre definidos pelo servidor.
+
+| Método | Rota | Role | Descrição |
+|---|---|---|---|
+| POST | `/api/expenses` | Employee | Cria um rascunho (`Draft`) do usuário autenticado; responde `201` |
+| PUT | `/api/expenses/{id}` | Employee | Edita o próprio rascunho; responde `200` |
+
+```http
+POST /api/expenses
+Authorization: Bearer <token de um Employee>
+Content-Type: application/json
+
+{ "description": "Táxi do aeroporto ao hotel", "amount": 85.50, "expenseDate": "2026-09-20", "categoryId": 1 }
+```
+
+- **Validação (`400`):** descrição entre 10 e 500 caracteres; valor entre `0.01` e `2147483647`; data no formato `yyyy-MM-dd`, não futura em relação ao dia corrente em Brasília; `categoryId` opcional, mas precisa existir (1 Transporte, 2 Alimentação, 3 Hospedagem, 4 Outros).
+- **Campos do servidor:** qualquer campo além dos quatro acima, como `ownerId`, `status` ou `createdAtUtc`, é recusado com `400`.
+- **Edição:** o `PUT` envia o rascunho completo. Reembolso inexistente ou de outro usuário responde `404`; fora de `Draft`, `409`. Se nada mudar, responde `200` sem gravar histórico.
+- **Histórico:** a criação grava a ação `Created` e cada edição grava `Updated`, com as alterações no campo `Changes` no formato `campo: antes -> depois` (por exemplo `amount: 85.50 -> 171.00; categoryId: 1 -> null`). A alteração e o histórico são salvos na mesma operação.
 
 ## Testes
 

@@ -86,3 +86,49 @@ Content-Type: application/json
 {
   "roles": ["SuperUser"]
 }
+
+###
+
+# Cria um rascunho com o token de um Employee: 201, estado Draft, dono vindo do token.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "description": "Táxi do aeroporto ao hotel",
+  "amount": 85.50,
+  "expenseDate": "2026-09-20",
+  "categoryId": 1
+}
+
+###
+
+# Tentativa de informar o dono ou o estado: 400.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "description": "Táxi do aeroporto ao hotel",
+  "amount": 85.50,
+  "expenseDate": "2026-09-20",
+  "ownerId": "outro-usuario",
+  "status": "Approved"
+}
+
+###
+
+# Cole aqui o id devolvido na criação.
+@expenseId = cole-o-id-do-reembolso
+
+# Edita o próprio rascunho: 200 e histórico "Updated" com as alterações.
+PUT {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "description": "Táxi do aeroporto ao hotel (ida e volta)",
+  "amount": 171.00,
+  "expenseDate": "2026-09-20",
+  "categoryId": 1
+}
