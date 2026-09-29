@@ -88,12 +88,24 @@ public sealed class RoleChangePlannerTests
     }
 
     /// <summary>
-    /// Maiúsculas, espaços e repetições são normalizados para o nome oficial da role.
+    /// Só o nome exato de uma role conhecida é aceito; variações de maiúsculas ou espaços são recusadas.
     /// </summary>
     [TestMethod]
-    public void Plan_NormalizesCaseSpacesAndDuplicates()
+    public void Plan_RejectsRoleNameThatIsNotExact()
     {
-        RoleChangePlan plan = RoleChangePlanner.Plan([], ["employee", " EMPLOYEE ", "Employee"], isSelf: false);
+        RoleChangePlan plan = RoleChangePlanner.Plan([], ["employee", " Employee "], isSelf: false);
+
+        Assert.AreEqual(RoleChangeStatus.UnknownRoles, plan.Status);
+        AssertRoles(plan.UnknownRoles, "employee", " Employee ");
+    }
+
+    /// <summary>
+    /// A mesma role repetida na requisição é adicionada uma única vez.
+    /// </summary>
+    [TestMethod]
+    public void Plan_IgnoresRepeatedRoleInRequest()
+    {
+        RoleChangePlan plan = RoleChangePlanner.Plan([], [Roles.Employee, Roles.Employee], isSelf: false);
 
         Assert.AreEqual(RoleChangeStatus.Accepted, plan.Status);
         AssertRoles(plan.ToAdd, Roles.Employee);

@@ -22,8 +22,8 @@ public class Expense
     /// <summary>Data em que a despesa ocorreu.</summary>
     public DateOnly ExpenseDate { get; set; }
 
-    /// <summary>Identificador da categoria.</summary>
-    public int CategoryId { get; set; }
+    /// <summary>Identificador da categoria, quando informada.</summary>
+    public int? CategoryId { get; set; }
 
     /// <summary>Categoria do reembolso.</summary>
     public ExpenseCategory? Category { get; set; }

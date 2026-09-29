@@ -29,16 +29,13 @@ public static class RoleChangePlanner
 
         foreach (string? requested in requestedRoles)
         {
-            string? known = Roles.All.FirstOrDefault(
-                role => string.Equals(role, requested?.Trim(), StringComparison.OrdinalIgnoreCase));
-
-            if (known is null)
+            if (requested is not null && Roles.All.Contains(requested))
             {
-                unknown.Add(requested ?? string.Empty);
+                desired.Add(requested);
             }
             else
             {
-                desired.Add(known);
+                unknown.Add(requested ?? string.Empty);
             }
         }
 

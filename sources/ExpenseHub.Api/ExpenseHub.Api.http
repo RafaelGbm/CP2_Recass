@@ -55,19 +55,19 @@ Content-Type: application/json
 
 ###
 
-# Usuário autenticado (roles do token atual).
-GET {{ExpenseHub_Api_HostAddress}}/api/me
-Authorization: Bearer {{userToken}}
-
-###
-
-# Lista de usuários: 401 sem token, 403 sem Admin, 200 com Admin.
+# Lista de usuários com o token do Admin: 200.
 GET {{ExpenseHub_Api_HostAddress}}/api/admin/users
 Authorization: Bearer {{adminToken}}
 
 ###
 
-# Substitui as roles do usuário. Depois, o usuário precisa fazer login de novo.
+# Lista de usuários com o token de um usuário sem Admin: 403.
+GET {{ExpenseHub_Api_HostAddress}}/api/admin/users
+Authorization: Bearer {{userToken}}
+
+###
+
+# Substitui as roles do usuário. Os tokens antigos dele passam a receber 401 até um novo login.
 PUT {{ExpenseHub_Api_HostAddress}}/api/admin/users/{{userId}}/roles
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json

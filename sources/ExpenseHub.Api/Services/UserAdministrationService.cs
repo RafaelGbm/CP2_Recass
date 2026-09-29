@@ -87,6 +87,12 @@ public sealed class UserAdministrationService(ExpenseHubDbContext db, UserManage
             (await userManager.AddToRolesAsync(user, plan.ToAdd)).ThrowIfFailed("adicionar roles");
         }
 
+        if (plan.ToAdd.Count > 0 || plan.ToRemove.Count > 0)
+        {
+            // Invalida os tokens emitidos com as roles antigas: o usuário precisa autenticar novamente.
+            (await userManager.UpdateSecurityStampAsync(user)).ThrowIfFailed("renovar o carimbo de segurança");
+        }
+
         await transaction.CommitAsync(cancellationToken);
 
         UserResponse response = new()
