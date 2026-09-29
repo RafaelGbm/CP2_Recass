@@ -64,16 +64,37 @@ O endpoint inicial `GET /health` existe apenas para confirmar que a aplicação 
 
 ## Banco de dados
 
-Você pode utilizar Microsoft SQL Server LocalDB, Oracle Database, SQLite ou outro provider relacional compatível com Entity Framework Core.
+O ExpenseHub usa **SQLite** por meio do Entity Framework Core.
 
-A escolha não gera pontos. Documente no README do seu repositório:
+- **Provider e pacote:** `Microsoft.EntityFrameworkCore.Sqlite` (10.0.12). O pacote `Microsoft.EntityFrameworkCore.Design` é usado apenas pelas migrations.
+- **Configuração:** a connection string está em `ConnectionStrings:ExpenseHub` no `appsettings.json` (`Data Source=expensehub.db`). O arquivo é criado na pasta de execução da API e não contém segredos. Para usar outro caminho, sobrescreva com a variável de ambiente `ConnectionStrings__ExpenseHub`.
+- **Criação ou atualização do banco:** as migrations ficam em `sources/ExpenseHub.Api/Migrations`. Em ambiente `Development`, a API aplica as migrations ao iniciar. Para aplicar manualmente, use a ferramenta local `dotnet-ef`, restaurada pelo manifesto `dotnet-tools.json`:
 
-- provider e pacote utilizado;
-- configuração necessária;
-- criação ou atualização do banco;
-- como iniciar a aplicação.
+```shell
+dotnet tool restore
+dotnet dotnet-ef database update --project ./sources/ExpenseHub.Api
+```
 
-Não versione senhas, tokens ou connection strings sensíveis.
+- **Nova migration** depois de alterar as entidades:
+
+```shell
+dotnet dotnet-ef migrations add NomeDaMigration --project ./sources/ExpenseHub.Api --output-dir Migrations
+```
+
+- **Como iniciar a aplicação:** `dotnet run --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj` (perfil `http`, `http://localhost:5245`). Confirme com `GET /health`.
+
+Os arquivos `*.db`, `*.db-shm` e `*.db-wal` estão no `.gitignore`. O build e os testes unitários não dependem do banco.
+
+### Entidades mínimas
+
+| Entidade | Papel |
+|---|---|
+| `Expense` | Reembolso com dono, descrição, valor, data, categoria, estado e datas em UTC |
+| `ExpenseCategory` | Categoria do reembolso, com quatro categorias iniciais criadas pela migration |
+| `ExpenseHistory` | Histórico de ações: ator, horário, estado anterior e novo, justificativa |
+| `PaymentRecord` | Pagamento simulado, no máximo um por reembolso |
+
+Os estados (`ExpenseStatus`) são gravados como texto no banco: `Draft`, `Submitted`, `Approved`, `Rejected` e `Paid`.
 
 ## Testes
 
