@@ -96,6 +96,57 @@ Os arquivos `*.db`, `*.db-shm` e `*.db-wal` estão no `.gitignore`. O build e os
 
 Os estados (`ExpenseStatus`) são gravados como texto no banco: `Draft`, `Submitted`, `Approved`, `Rejected` e `Paid`.
 
+## Autenticação e conta Admin
+
+A API usa ASP.NET Core Identity com as tabelas no mesmo banco SQLite e autenticação por **token bearer**.
+
+### Roles
+
+`Admin`, `Employee`, `Approver`, `Finance` e `Auditor`. Elas são criadas pelo seed ao iniciar a aplicação, e nenhuma outra role é criada.
+
+### Conta Admin inicial
+
+O seed cria **uma única** conta Admin e pode ser executado várias vezes sem duplicar roles nem usuários. Se já existir algum usuário com a role Admin, nada é criado.
+
+- O e-mail vem de `Seed:AdminEmail` no `appsettings.json` (`admin@expensehub.local`).
+- A senha **não fica no repositório**. Configure com User Secrets antes de iniciar a API:
+
+```shell
+dotnet user-secrets set "Seed:AdminPassword" "<sua-senha>" --project ./sources/ExpenseHub.Api
+```
+
+Ou use a variável de ambiente `Seed__AdminPassword`. A senha segue a política padrão do Identity: pelo menos 6 caracteres, com letra maiúscula, minúscula, número e símbolo. Sem senha configurada, a API inicia normalmente, registra um aviso e não cria o Admin.
+
+### Login
+
+```http
+POST /login
+Content-Type: application/json
+
+{ "email": "admin@expensehub.local", "password": "<sua-senha>" }
+```
+
+A resposta traz `accessToken`, válido por 1 hora. Envie-o nas rotas protegidas:
+
+```http
+GET /api/me
+Authorization: Bearer <accessToken>
+```
+
+`GET /api/me` mostra id, e-mail e roles do token atual. As roles ficam gravadas no token: **depois de uma mudança de roles, o usuário precisa fazer login de novo** para o novo token refletir as roles atuais.
+
+### Respostas de erro
+
+Os erros usam `ProblemDetails`:
+
+| Status | Quando |
+|---|---|
+| 400 | Entrada inválida (por exemplo, e-mail mal formatado no login) |
+| 401 | Sem token, token inválido ou expirado, ou credenciais erradas no login |
+| 403 | Autenticado, mas sem a role exigida pela rota |
+
+Após 5 tentativas de login erradas seguidas, a conta fica bloqueada por 5 minutos.
+
 ## Testes
 
 Somente testes unitários escritos por você entram na nota. Testes de integração, end-to-end ou de interface são permitidos, mas opcionais e sem pontuação.
