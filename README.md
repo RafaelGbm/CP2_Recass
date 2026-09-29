@@ -147,6 +147,49 @@ Os erros usam `ProblemDetails`:
 
 Após 5 tentativas de login erradas seguidas, a conta fica bloqueada por 5 minutos.
 
+## Cadastro e gerenciamento de roles
+
+### Cadastro
+
+```http
+POST /register
+Content-Type: application/json
+
+{ "email": "ana@empresa.com", "password": "<senha>" }
+```
+
+- Cria o usuário **sem nenhuma role** e responde `201` com id, e-mail e `roles: []`.
+- O cadastro **não aceita roles**: qualquer campo além de `email` e `password` (por exemplo `"roles"`) é recusado com `400`.
+- E-mail inválido, e-mail já cadastrado ou senha fora da política do Identity também respondem `400`.
+
+Enquanto não receber roles do Admin, o usuário consegue fazer login, mas não executa nenhuma operação protegida (`403`).
+
+### Rotas do Admin
+
+Todas exigem token de um usuário com a role `Admin`: sem token, `401`; com token sem Admin, `403`.
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/admin/users` | Lista usuários com suas roles |
+| PUT | `/api/admin/users/{id}/roles` | Substitui as roles do usuário pelo conjunto enviado |
+
+```http
+PUT /api/admin/users/{id}/roles
+Authorization: Bearer <token do Admin>
+Content-Type: application/json
+
+{ "roles": ["Employee", "Approver"] }
+```
+
+- O corpo é o **conjunto completo** desejado: roles ausentes são removidas e uma lista vazia remove todas.
+- Só as cinco roles conhecidas são aceitas, sem diferenciar maiúsculas. Uma role desconhecida responde `400` e nada é alterado; nenhuma role nova é criada.
+- Usuário inexistente responde `404`.
+- O Admin **não pode remover a própria role Admin** (`409`), para não perder o acesso administrativo.
+
+> **Importante:** as roles ficam gravadas no token. Depois de uma alteração de roles, o usuário precisa **fazer login de novo** para receber um token com as roles atualizadas. O token antigo continua válido, com as roles antigas, até expirar (1 hora).
+
+O arquivo `sources/ExpenseHub.Api/ExpenseHub.Api.http` traz essas requisições prontas para o VS Code (extensão REST Client) ou o Visual Studio.
+
 ## Testes
 
 Somente testes unitários escritos por você entram na nota. Testes de integração, end-to-end ou de interface são permitidos, mas opcionais e sem pontuação.

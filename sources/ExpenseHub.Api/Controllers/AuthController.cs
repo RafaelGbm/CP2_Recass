@@ -9,13 +9,53 @@ using Microsoft.AspNetCore.Mvc;
 namespace ExpenseHub.Api.Controllers;
 
 /// <summary>
-/// Autenticação por token bearer.
+/// Cadastro de usuários e autenticação por token bearer.
 /// </summary>
 /// <param name="signInManager">Gerenciador de login do Identity.</param>
+/// <param name="userManager">Gerenciador de usuários do Identity.</param>
 [ApiController]
 [AllowAnonymous]
-public sealed class AuthController(SignInManager<IdentityUser> signInManager) : ControllerBase
+public sealed class AuthController(
+    SignInManager<IdentityUser> signInManager,
+    UserManager<IdentityUser> userManager) : ControllerBase
 {
+    /// <summary>
+    /// Cadastra um usuário sem nenhuma role. Roles são atribuídas apenas pelo Admin.
+    /// </summary>
+    /// <param name="request">E-mail e senha.</param>
+    /// <returns>O usuário criado, ou 400 com os erros de validação.</returns>
+    [HttpPost("/register")]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<UserResponse>> Register([FromBody] RegisterRequest request)
+    {
+        IdentityUser user = new()
+        {
+            UserName = request.Email,
+            Email = request.Email,
+        };
+
+        IdentityResult result = await userManager.CreateAsync(user, request.Password);
+        if (!result.Succeeded)
+        {
+            foreach (IdentityError error in result.Errors)
+            {
+                ModelState.AddModelError(error.Code, error.Description);
+            }
+
+            return ValidationProblem(ModelState);
+        }
+
+        UserResponse response = new()
+        {
+            Id = user.Id,
+            Email = request.Email,
+            Roles = [],
+        };
+
+        return StatusCode(StatusCodes.Status201Created, response);
+    }
+
     /// <summary>
     /// Valida as credenciais e emite um token bearer.
     /// </summary>

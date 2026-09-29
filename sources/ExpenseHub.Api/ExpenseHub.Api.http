@@ -1,9 +1,88 @@
 @ExpenseHub_Api_HostAddress = http://localhost:5245
 
+# Cole aqui os tokens retornados por /login.
+@adminToken = cole-o-token-do-admin
+@userToken = cole-o-token-do-usuario
+@userId = cole-o-id-do-usuario
+
 GET {{ExpenseHub_Api_HostAddress}}/health
 Accept: application/json
 
 ###
 
-# Os endpoints do checkpoint estão definidos em docs/REQUISITOS.md.
-# Implemente e adicione aqui as requisições usadas para validar cada issue.
+# Cadastro: cria o usuário sem roles.
+POST {{ExpenseHub_Api_HostAddress}}/register
+Content-Type: application/json
+
+{
+  "email": "ana@empresa.com",
+  "password": "<senha-do-usuario>"
+}
+
+###
+
+# Cadastro com roles: recusado com 400.
+POST {{ExpenseHub_Api_HostAddress}}/register
+Content-Type: application/json
+
+{
+  "email": "eve@empresa.com",
+  "password": "<senha-do-usuario>",
+  "roles": ["Admin"]
+}
+
+###
+
+# Login do Admin (senha configurada em Seed:AdminPassword).
+POST {{ExpenseHub_Api_HostAddress}}/login
+Content-Type: application/json
+
+{
+  "email": "admin@expensehub.local",
+  "password": "<senha-do-admin>"
+}
+
+###
+
+# Login do usuário cadastrado.
+POST {{ExpenseHub_Api_HostAddress}}/login
+Content-Type: application/json
+
+{
+  "email": "ana@empresa.com",
+  "password": "<senha-do-usuario>"
+}
+
+###
+
+# Usuário autenticado (roles do token atual).
+GET {{ExpenseHub_Api_HostAddress}}/api/me
+Authorization: Bearer {{userToken}}
+
+###
+
+# Lista de usuários: 401 sem token, 403 sem Admin, 200 com Admin.
+GET {{ExpenseHub_Api_HostAddress}}/api/admin/users
+Authorization: Bearer {{adminToken}}
+
+###
+
+# Substitui as roles do usuário. Depois, o usuário precisa fazer login de novo.
+PUT {{ExpenseHub_Api_HostAddress}}/api/admin/users/{{userId}}/roles
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "roles": ["Employee", "Approver"]
+}
+
+###
+
+# Role desconhecida: 400, nada é alterado.
+PUT {{ExpenseHub_Api_HostAddress}}/api/admin/users/{{userId}}/roles
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "roles": ["SuperUser"]
+}

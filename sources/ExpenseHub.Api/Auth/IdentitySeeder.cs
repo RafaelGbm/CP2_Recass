@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -31,7 +29,7 @@ public sealed class IdentitySeeder(
         {
             if (!await roleManager.RoleExistsAsync(role))
             {
-                EnsureSucceeded(await roleManager.CreateAsync(new IdentityRole(role)), $"criar a role {role}");
+                (await roleManager.CreateAsync(new IdentityRole(role))).ThrowIfFailed($"criar a role {role}");
             }
         }
 
@@ -64,17 +62,8 @@ public sealed class IdentitySeeder(
             EmailConfirmed = true,
         };
 
-        EnsureSucceeded(await userManager.CreateAsync(admin, seed.AdminPassword), "criar a conta Admin");
-        EnsureSucceeded(await userManager.AddToRoleAsync(admin, Roles.Admin), "atribuir a role Admin");
+        (await userManager.CreateAsync(admin, seed.AdminPassword)).ThrowIfFailed("criar a conta Admin");
+        (await userManager.AddToRoleAsync(admin, Roles.Admin)).ThrowIfFailed("atribuir a role Admin");
         logger.LogInformation("Conta Admin inicial criada.");
-    }
-
-    private static void EnsureSucceeded(IdentityResult result, string operation)
-    {
-        if (!result.Succeeded)
-        {
-            string errors = string.Join("; ", result.Errors.Select(error => error.Description));
-            throw new InvalidOperationException($"Falha ao {operation}: {errors}");
-        }
     }
 }
