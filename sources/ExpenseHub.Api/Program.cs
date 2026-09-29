@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using ExpenseHub.Api.Auth;
 using ExpenseHub.Api.Data;
+using ExpenseHub.Api.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -39,6 +40,7 @@ internal static class Program
 
         builder.Services.Configure<AdminSeedOptions>(builder.Configuration.GetSection(AdminSeedOptions.SectionName));
         builder.Services.AddScoped<IdentitySeeder>();
+        builder.Services.AddScoped<UserAdministrationService>();
 
         WebApplication app = builder.Build();
 
