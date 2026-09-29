@@ -85,7 +85,6 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        // O filtro por dono fica na consulta: reembolso de outro usuário é tratado como inexistente.
         Expense? expense = await db.Expenses
             .FirstOrDefaultAsync(e => e.Id == expenseId && e.OwnerId == userId, cancellationToken);
         if (expense is null)

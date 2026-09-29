@@ -7,10 +7,6 @@ namespace ExpenseHub.Api.Domain;
 /// <summary>
 /// Descreve as alterações de um rascunho para o campo <see cref="ExpenseHistory.Changes"/>, sem acessar o banco.
 /// </summary>
-/// <remarks>
-/// Formato: <c>campo: antes -&gt; depois</c>, separados por <c>"; "</c>, com os nomes dos campos do JSON.
-/// Valores em cultura invariante; descrição entre aspas; categoria ausente como <c>null</c>.
-/// </remarks>
 public static class ExpenseChangeDescriber
 {
     /// <summary>

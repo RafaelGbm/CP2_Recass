@@ -89,7 +89,6 @@ Content-Type: application/json
 
 ###
 
-# Cria um rascunho com o token de um Employee: 201, estado Draft, dono vindo do token.
 POST {{ExpenseHub_Api_HostAddress}}/api/expenses
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -103,7 +102,6 @@ Content-Type: application/json
 
 ###
 
-# Tentativa de informar o dono ou o estado: 400.
 POST {{ExpenseHub_Api_HostAddress}}/api/expenses
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -118,10 +116,8 @@ Content-Type: application/json
 
 ###
 
-# Cole aqui o id devolvido na criação.
 @expenseId = cole-o-id-do-reembolso
 
-# Edita o próprio rascunho: 200 e histórico "Updated" com as alterações.
 PUT {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
