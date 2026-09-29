@@ -10,7 +10,7 @@ namespace ExpenseHub.UnitTests.Data;
 [TestClass]
 public sealed class UtcDateTimeConverterTests
 {
-    private static readonly DateTime Instant = new(2026, 9, 29, 12, 30, 0);
+    private static readonly DateTime _instant = new(2026, 9, 29, 12, 30, 0);
 
     /// <summary>
     /// Um instante já em UTC é gravado sem alteração.
@@ -18,7 +18,7 @@ public sealed class UtcDateTimeConverterTests
     [TestMethod]
     public void ToUtc_KeepsUtcValue()
     {
-        DateTime utc = DateTime.SpecifyKind(Instant, DateTimeKind.Utc);
+        DateTime utc = DateTime.SpecifyKind(_instant, DateTimeKind.Utc);
 
         DateTime stored = UtcDateTimeConverter.ToUtc(utc);
 
@@ -32,7 +32,7 @@ public sealed class UtcDateTimeConverterTests
     [TestMethod]
     public void ToUtc_ConvertsLocalValue()
     {
-        DateTime local = DateTime.SpecifyKind(Instant, DateTimeKind.Local);
+        DateTime local = DateTime.SpecifyKind(_instant, DateTimeKind.Local);
 
         DateTime stored = UtcDateTimeConverter.ToUtc(local);
 
@@ -47,11 +47,11 @@ public sealed class UtcDateTimeConverterTests
     public void ConvertFromProvider_MarksValueAsUtc()
     {
         UtcDateTimeConverter converter = new();
-        DateTime fromDatabase = DateTime.SpecifyKind(Instant, DateTimeKind.Unspecified);
+        DateTime fromDatabase = DateTime.SpecifyKind(_instant, DateTimeKind.Unspecified);
 
         DateTime read = (DateTime)converter.ConvertFromProvider(fromDatabase)!;
 
         Assert.AreEqual(DateTimeKind.Utc, read.Kind);
-        Assert.AreEqual(Instant.Ticks, read.Ticks);
+        Assert.AreEqual(_instant.Ticks, read.Ticks);
     }
 }
