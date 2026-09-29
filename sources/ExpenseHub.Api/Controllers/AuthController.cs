@@ -73,7 +73,7 @@ public sealed class AuthController(
             request.Email,
             request.Password,
             isPersistent: false,
-            lockoutOnFailure: true);
+            lockoutOnFailure: false);
 
         if (!result.Succeeded)
         {

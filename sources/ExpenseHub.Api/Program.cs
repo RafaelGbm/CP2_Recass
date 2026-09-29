@@ -29,11 +29,7 @@ internal static class Program
             .AddBearerToken(IdentityConstants.BearerScheme);
         builder.Services.AddAuthorization();
 
-        builder.Services.AddIdentityCore<IdentityUser>(options =>
-            {
-                options.User.RequireUniqueEmail = true;
-                options.Lockout.MaxFailedAccessAttempts = 5;
-            })
+        builder.Services.AddIdentityCore<IdentityUser>(options => options.User.RequireUniqueEmail = true)
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<ExpenseHubDbContext>()
             .AddApiEndpoints();
@@ -47,16 +43,19 @@ internal static class Program
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
-        if (app.Environment.IsDevelopment())
+        using (IServiceScope scope = app.Services.CreateScope())
         {
-            app.MapOpenApi();
-
-            using IServiceScope scope = app.Services.CreateScope();
             await scope.ServiceProvider.GetRequiredService<ExpenseHubDbContext>().Database.MigrateAsync();
             await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync();
         }
 
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapOpenApi();
+        }
+
         app.UseAuthentication();
+        app.UseSecurityStampValidation();
         app.UseAuthorization();
 
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
