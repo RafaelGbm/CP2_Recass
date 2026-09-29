@@ -37,6 +37,7 @@ internal static class Program
         builder.Services.Configure<AdminSeedOptions>(builder.Configuration.GetSection(AdminSeedOptions.SectionName));
         builder.Services.AddScoped<IdentitySeeder>();
         builder.Services.AddScoped<UserAdministrationService>();
+        builder.Services.AddScoped<ExpenseService>();
 
         WebApplication app = builder.Build();
 
