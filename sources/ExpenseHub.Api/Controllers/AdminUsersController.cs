@@ -45,7 +45,6 @@ public sealed class AdminUsersController(UserAdministrationService service) : Co
     [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserResponse>> UpdateRoles(
         string id,
         [FromBody] UpdateUserRolesRequest request,
@@ -68,9 +67,8 @@ public sealed class AdminUsersController(UserAdministrationService service) : Co
                 return ValidationProblem(ModelState);
 
             case RoleChangeStatus.SelfAdminRemoval:
-                return Problem(
-                    statusCode: StatusCodes.Status409Conflict,
-                    title: "O Admin não pode remover a própria role Admin.");
+                ModelState.AddModelError(nameof(request.Roles), "O Admin não pode remover a própria role Admin.");
+                return ValidationProblem(ModelState);
 
             default:
                 return Ok(result.User);
