@@ -178,6 +178,8 @@ Exigem token: sem token, `401`; com token sem a role exigida, `403`. Dono, estad
 | POST | `/api/expenses/{id}/submit` | Employee | Envia o próprio rascunho (`Draft` para `Submitted`); responde `200` |
 | GET | `/api/expenses` | Employee, Approver, Finance, Auditor | Lista os reembolsos visíveis, do mais recente para o mais antigo |
 | GET | `/api/expenses/{id}` | Employee, Approver, Finance, Auditor | Consulta um reembolso visível |
+| POST | `/api/expenses/{id}/pay` | Finance | Registra o pagamento de um reembolso aprovado de outra pessoa (`Approved` para `Paid`); responde `200` |
+| GET | `/api/expenses/{id}/history` | Employee, Approver, Finance, Auditor | Histórico do reembolso, em ordem cronológica, com a mesma visibilidade do reembolso |
 
 ```http
 POST /api/expenses
@@ -193,7 +195,8 @@ Content-Type: application/json
 - **Visibilidade:** as roles acumulam e o resultado é a união dos escopos. Employee vê os próprios; Approver, os `Submitted`; Finance, os `Approved` e `Paid`; Auditor, todos. Admin sem outra role não tem acesso (`403`). O filtro é aplicado na consulta ao banco, e um reembolso fora do escopo responde `404`.
 - **Envio:** só o dono envia, e só em `Draft`. Reembolso fora do escopo responde `404`; visível mas de outra pessoa, `403`; fora de `Draft` ou já enviado, `409`. O estado é usado como token de concorrência: se duas operações alterarem o mesmo reembolso ao mesmo tempo, a segunda responde `409` e não grava histórico.
 - **Matriz de acesso:** a decisão de role, propriedade e estado fica na camada de serviço (`ExpenseAccessPolicy`), além do `[Authorize]`. A ordem é: fora do escopo de leitura, `404`; sem a role da operação ou regra de propriedade violada, `403`; estado incompatível, `409`. Ninguém aprova, reprova ou paga o próprio reembolso, mesmo acumulando roles; o Auditor não altera dados.
-- **Histórico:** a criação grava a ação `Created`, cada edição grava `Updated` e o envio grava `Submitted`. A edição registra as alterações no campo `Changes` no formato `campo: antes -> depois` (por exemplo `amount: 85.50 -> 171.00; categoryId: 1 -> null`). A alteração e o histórico são salvos na mesma operação.
+- **Pagamento:** só o Finance que não é o dono paga, e só em `Approved`. O pagamento é simulado: grava um `PaymentRecord` com o ator e o instante definidos pelo servidor, no máximo um por reembolso. Pagamento repetido responde `409`. Estado, histórico `Paid` e `PaymentRecord` são salvos em um único `SaveChangesAsync`: se a gravação falhar, nada muda.
+- **Histórico:** a criação grava a ação `Created`, cada edição grava `Updated`, o envio grava `Submitted` e o pagamento grava `Paid`. Cada registro traz ação, ator, instante UTC e estados anterior e posterior. A edição registra as alterações no campo `Changes` no formato `campo: antes -> depois` (por exemplo `amount: 85.50 -> 171.00; categoryId: 1 -> null`). A alteração e o histórico são salvos na mesma operação.
 
 ## Testes
 
