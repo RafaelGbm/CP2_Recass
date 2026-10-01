@@ -70,32 +70,34 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
     /// Edita um rascunho do próprio usuário. Sem alterações efetivas, nada é gravado.
     /// </summary>
     /// <param name="expenseId">Reembolso editado.</param>
-    /// <param name="userId">Usuário autenticado.</param>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
     /// <param name="request">Novos dados do rascunho, já validados.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <returns>
-    /// O rascunho atualizado; <see cref="ExpenseOperationStatus.NotFound"/> se não existir ou for de outro usuário;
+    /// O rascunho atualizado; <see cref="ExpenseOperationStatus.NotFound"/> se não existir ou estiver fora do escopo;
+    /// <see cref="ExpenseOperationStatus.Forbidden"/> se for visível mas de outro usuário;
     /// <see cref="ExpenseOperationStatus.Conflict"/> se não estiver em Draft;
     /// <see cref="ExpenseOperationStatus.InvalidCategory"/> se a categoria não existir.
     /// </returns>
     public async Task<ExpenseOperationResult> UpdateAsync(
         Guid expenseId,
-        string userId,
+        ExpenseViewer viewer,
         ExpenseDraftRequest request,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(viewer);
         ArgumentNullException.ThrowIfNull(request);
 
-        Expense? expense = await db.Expenses
-            .FirstOrDefaultAsync(e => e.Id == expenseId && e.OwnerId == userId, cancellationToken);
+        Expense? expense = await FindVisibleAsync(expenseId, viewer, cancellationToken);
         if (expense is null)
         {
             return ExpenseOperationResult.Failed(ExpenseOperationStatus.NotFound);
         }
 
-        if (!ExpenseWorkflow.CanEdit(expense.Status))
+        ExpenseAccessDecision decision = ExpenseAccessPolicy.Decide(viewer, ExpenseOperation.Edit, expense.OwnerId, expense.Status);
+        if (decision != ExpenseAccessDecision.Allowed)
         {
-            return ExpenseOperationResult.Failed(ExpenseOperationStatus.Conflict);
+            return ExpenseOperationResult.Failed(ToFailureStatus(decision));
         }
 
         (bool Found, string? Name) category = await FindCategoryAsync(request.CategoryId, cancellationToken);
@@ -128,7 +130,7 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
         {
             ExpenseId = expense.Id,
             Action = ExpenseActions.Updated,
-            ActorId = userId,
+            ActorId = viewer.UserId,
             OccurredAtUtc = now,
             PreviousStatus = ExpenseStatus.Draft,
             NewStatus = ExpenseStatus.Draft,
@@ -195,32 +197,42 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
     /// <see cref="ExpenseOperationStatus.Forbidden"/> se for visível mas de outro usuário;
     /// <see cref="ExpenseOperationStatus.Conflict"/> se não estiver em Draft.
     /// </returns>
-    public async Task<ExpenseOperationResult> SubmitAsync(
+    public Task<ExpenseOperationResult> SubmitAsync(
         Guid expenseId,
         ExpenseViewer viewer,
+        CancellationToken cancellationToken) =>
+        TransitionAsync(expenseId, viewer, ExpenseOperation.Submit, cancellationToken);
+
+    private static ExpenseOperationStatus ToFailureStatus(ExpenseAccessDecision decision) => decision switch
+    {
+        ExpenseAccessDecision.Forbidden => ExpenseOperationStatus.Forbidden,
+        ExpenseAccessDecision.Conflict => ExpenseOperationStatus.Conflict,
+        _ => throw new ArgumentOutOfRangeException(nameof(decision), decision, "Decisão sem falha correspondente."),
+    };
+
+    private async Task<ExpenseOperationResult> TransitionAsync(
+        Guid expenseId,
+        ExpenseViewer viewer,
+        ExpenseOperation operation,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(viewer);
 
-        Expense? expense = await db.Expenses
-            .Include(e => e.Category)
-            .Where(ExpenseVisibility.VisibleTo(viewer))
-            .FirstOrDefaultAsync(e => e.Id == expenseId, cancellationToken);
+        Expense? expense = await FindVisibleAsync(expenseId, viewer, cancellationToken);
         if (expense is null)
         {
             return ExpenseOperationResult.Failed(ExpenseOperationStatus.NotFound);
         }
 
-        if (!ExpenseWorkflow.SatisfiesOwnership(ExpenseTransition.Submit, expense.OwnerId == viewer.UserId))
+        ExpenseAccessDecision decision = ExpenseAccessPolicy.Decide(viewer, operation, expense.OwnerId, expense.Status);
+        if (decision != ExpenseAccessDecision.Allowed)
         {
-            return ExpenseOperationResult.Failed(ExpenseOperationStatus.Forbidden);
+            return ExpenseOperationResult.Failed(ToFailureStatus(decision));
         }
 
+        ExpenseTransition transition = ExpenseAccessPolicy.ToTransition(operation);
         ExpenseStatus previous = expense.Status;
-        if (!ExpenseWorkflow.TryTransition(previous, ExpenseTransition.Submit, out ExpenseStatus next))
-        {
-            return ExpenseOperationResult.Failed(ExpenseOperationStatus.Conflict);
-        }
+        ExpenseWorkflow.TryTransition(previous, transition, out ExpenseStatus next);
 
         DateTime now = DateTime.UtcNow;
         expense.Status = next;
@@ -229,7 +241,7 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
         db.ExpenseHistories.Add(new ExpenseHistory
         {
             ExpenseId = expense.Id,
-            Action = ExpenseWorkflow.ActionName(ExpenseTransition.Submit),
+            Action = ExpenseWorkflow.ActionName(transition),
             ActorId = viewer.UserId,
             OccurredAtUtc = now,
             PreviousStatus = previous,
@@ -243,6 +255,12 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
 
         return ExpenseOperationResult.Succeeded(ToResponse(expense, expense.Category?.Name));
     }
+
+    private Task<Expense?> FindVisibleAsync(Guid expenseId, ExpenseViewer viewer, CancellationToken cancellationToken) =>
+        db.Expenses
+            .Include(e => e.Category)
+            .Where(ExpenseVisibility.VisibleTo(viewer))
+            .FirstOrDefaultAsync(e => e.Id == expenseId, cancellationToken);
 
     private static ExpenseResponse ToResponse(Expense expense, string? categoryName) => new()
     {
