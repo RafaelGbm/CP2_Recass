@@ -7,7 +7,7 @@ using System.Text.Json;
 using ExpenseHub.Api.Dtos;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace ExpenseHub.UnitTests.Dtos;
+namespace ExpenseHub.UnitTests.Validation;
 
 /// <summary>
 /// Validação declarativa dos dados de criação e edição do rascunho.
