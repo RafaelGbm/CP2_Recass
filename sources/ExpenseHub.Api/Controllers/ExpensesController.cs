@@ -61,7 +61,7 @@ public sealed class ExpensesController(ExpenseService service) : ControllerBase
         [FromBody] ExpenseDraftRequest request,
         CancellationToken cancellationToken)
     {
-        ExpenseOperationResult result = await service.UpdateAsync(id, CurrentUserId(), request, cancellationToken);
+        ExpenseOperationResult result = await service.UpdateAsync(id, CurrentViewer(), request, cancellationToken);
         return ToActionResult(result, StatusCodes.Status200OK);
     }
 
