@@ -178,6 +178,8 @@ Exigem token: sem token, `401`; com token sem a role exigida, `403`. Dono, estad
 | POST | `/api/expenses/{id}/submit` | Employee | Envia o próprio rascunho (`Draft` para `Submitted`); responde `200` |
 | GET | `/api/expenses` | Employee, Approver, Finance, Auditor | Lista os reembolsos visíveis, do mais recente para o mais antigo |
 | GET | `/api/expenses/{id}` | Employee, Approver, Finance, Auditor | Consulta um reembolso visível |
+| POST | `/api/expenses/{id}/approve` | Approver | Aprova um reembolso enviado por outra pessoa (`Submitted` para `Approved`); responde `200` |
+| POST | `/api/expenses/{id}/reject` | Approver | Reprova um reembolso enviado por outra pessoa (`Submitted` para `Rejected`), com justificativa; responde `200` |
 
 ```http
 POST /api/expenses
@@ -192,8 +194,9 @@ Content-Type: application/json
 - **Edição:** o `PUT` envia o rascunho completo. Só o dono edita, e só em `Draft`. Reembolso fora do escopo responde `404`; visível mas de outra pessoa, `403`; fora de `Draft`, `409`. Se nada mudar, responde `200` sem gravar histórico.
 - **Visibilidade:** as roles acumulam e o resultado é a união dos escopos. Employee vê os próprios; Approver, os `Submitted`; Finance, os `Approved` e `Paid`; Auditor, todos. Admin sem outra role não tem acesso (`403`). O filtro é aplicado na consulta ao banco, e um reembolso fora do escopo responde `404`.
 - **Envio:** só o dono envia, e só em `Draft`. Reembolso fora do escopo responde `404`; visível mas de outra pessoa, `403`; fora de `Draft` ou já enviado, `409`. O estado é usado como token de concorrência: se duas operações alterarem o mesmo reembolso ao mesmo tempo, a segunda responde `409` e não grava histórico.
-- **Matriz de acesso:** a decisão de role, propriedade e estado fica na camada de serviço (`ExpenseAccessPolicy`), além do `[Authorize]`. A ordem é: fora do escopo de leitura, `404`; sem a role da operação ou regra de propriedade violada, `403`; estado incompatível, `409`. Ninguém aprova, reprova ou paga o próprio reembolso, mesmo acumulando roles; o Auditor não altera dados.
-- **Histórico:** a criação grava a ação `Created`, cada edição grava `Updated` e o envio grava `Submitted`. A edição registra as alterações no campo `Changes` no formato `campo: antes -> depois` (por exemplo `amount: 85.50 -> 171.00; categoryId: 1 -> null`). A alteração e o histórico são salvos na mesma operação.
+- **Aprovação e reprovação:** só um Approver que não é o dono decide, e só em `Submitted`. A reprovação exige o corpo `{ "justification": "..." }`, com 10 a 500 caracteres; justificativa ausente, curta, longa ou campos extras respondem `400`. O dono, mesmo tendo a role Approver, recebe `403`. Um reembolso recebe uma única decisão: aprovar ou reprovar de novo, ou decidir um reembolso `Approved`, `Rejected` ou `Paid`, responde `409` sem gravar histórico.
+- **Matriz de acesso:** a decisão de role, propriedade e estado fica na camada de serviço (`ExpenseAccessPolicy`), além do `[Authorize]`. A ordem é: fora do escopo de leitura, `404`; sem a role da operação ou regra de propriedade violada, `403`; estado incompatível, `409`. Na aprovação e na reprovação, todo reembolso que já saiu de `Draft` é alcançado por quem tem a role Approver, mesmo fora do escopo de leitura: assim, decidir de novo um reembolso já aprovado ou reprovado responde `409`, e não `404`. Rascunhos de outras pessoas continuam respondendo `404`. Ninguém aprova, reprova ou paga o próprio reembolso, mesmo acumulando roles; o Auditor não altera dados.
+- **Histórico:** a criação grava a ação `Created`, cada edição grava `Updated`, o envio grava `Submitted`, a aprovação grava `Approved` e a reprovação grava `Rejected` com a justificativa no campo `Justification`. A edição registra as alterações no campo `Changes` no formato `campo: antes -> depois` (por exemplo `amount: 85.50 -> 171.00; categoryId: 1 -> null`). A alteração e o histórico são salvos na mesma operação.
 
 ## Testes
 
