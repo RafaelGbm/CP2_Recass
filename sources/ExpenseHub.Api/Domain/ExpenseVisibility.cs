@@ -29,6 +29,28 @@ public static class ExpenseVisibility
             || (isApprover && expense.Status == ExpenseStatus.Submitted)
             || (isFinance && (expense.Status == ExpenseStatus.Approved || expense.Status == ExpenseStatus.Paid));
     }
+
+    /// <summary>
+    /// Monta o filtro dos reembolsos que, mesmo fora do escopo de leitura, podem ser alvo da operação: os que já
+    /// saíram de Draft, para quem tem a role da operação. Assim, aprovar de novo um reembolso já decidido responde
+    /// 409 (transição incompatível) em vez de 404, e rascunhos de outras pessoas continuam invisíveis.
+    /// </summary>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
+    /// <param name="operation">Aprovar, reprovar ou pagar.</param>
+    /// <returns>O predicado traduzível para SQL.</returns>
+    public static Expression<Func<Expense, bool>> ActionableBy(ExpenseViewer viewer, ExpenseOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(viewer);
+
+        bool hasOperationRole = operation switch
+        {
+            ExpenseOperation.Approve or ExpenseOperation.Reject => viewer.IsApprover,
+            ExpenseOperation.Pay => viewer.IsFinance,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Somente aprovar, reprovar e pagar."),
+        };
+
+        return expense => hasOperationRole && expense.Status != ExpenseStatus.Draft;
+    }
 }
 
 /// <summary>
