@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ExpenseHub.Api.Data;
 using ExpenseHub.Api.Domain;
 using ExpenseHub.Api.Dtos;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseHub.Api.Services;
@@ -16,6 +17,8 @@ namespace ExpenseHub.Api.Services;
 /// <param name="db">Contexto do banco.</param>
 public sealed class ExpenseService(ExpenseHubDbContext db)
 {
+    private const int SqliteConstraintViolation = 19;
+
     /// <summary>
     /// Cria um rascunho do usuário autenticado e grava o histórico de criação na mesma operação.
     /// </summary>
@@ -239,6 +242,64 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
         CancellationToken cancellationToken) =>
         TransitionAsync(expenseId, viewer, ExpenseOperation.Reject, justification, cancellationToken);
 
+    /// <summary>
+    /// Registra o pagamento simulado de um reembolso aprovado de outra pessoa (Approved para Paid).
+    /// Estado, histórico e <see cref="PaymentRecord"/> são gravados na mesma operação.
+    /// </summary>
+    /// <param name="expenseId">Reembolso pago.</param>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    /// O reembolso em Paid; <see cref="ExpenseOperationStatus.NotFound"/> se não existir ou estiver fora do escopo;
+    /// <see cref="ExpenseOperationStatus.Forbidden"/> se o usuário for o dono ou não for Finance;
+    /// <see cref="ExpenseOperationStatus.Conflict"/> se não estiver em Approved ou já tiver sido pago.
+    /// </returns>
+    public Task<ExpenseOperationResult> PayAsync(
+        Guid expenseId,
+        ExpenseViewer viewer,
+        CancellationToken cancellationToken) =>
+        TransitionAsync(expenseId, viewer, ExpenseOperation.Pay, null, cancellationToken);
+
+    /// <summary>
+    /// Consulta o histórico de um reembolso, com a mesma visibilidade do reembolso.
+    /// </summary>
+    /// <param name="expenseId">Reembolso consultado.</param>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Os registros em ordem cronológica, ou <see langword="null"/> se o reembolso não existir ou estiver fora do escopo.</returns>
+    public async Task<IReadOnlyList<ExpenseHistoryResponse>?> GetHistoryAsync(
+        Guid expenseId,
+        ExpenseViewer viewer,
+        CancellationToken cancellationToken)
+    {
+        bool visible = await db.Expenses
+            .Where(ExpenseVisibility.VisibleTo(viewer))
+            .AnyAsync(e => e.Id == expenseId, cancellationToken);
+        if (!visible)
+        {
+            return null;
+        }
+
+        List<ExpenseHistory> entries = await db.ExpenseHistories
+            .AsNoTracking()
+            .Where(h => h.ExpenseId == expenseId)
+            .OrderBy(h => h.Id)
+            .ToListAsync(cancellationToken);
+
+        return [.. entries.Select(ToHistoryResponse)];
+    }
+
+    private static ExpenseHistoryResponse ToHistoryResponse(ExpenseHistory entry) => new()
+    {
+        Action = entry.Action,
+        ActorId = entry.ActorId,
+        OccurredAtUtc = entry.OccurredAtUtc,
+        PreviousStatus = entry.PreviousStatus?.ToString(),
+        NewStatus = entry.NewStatus.ToString(),
+        Justification = entry.Justification,
+        Changes = entry.Changes,
+    };
+
     private static ExpenseOperationStatus ToFailureStatus(ExpenseAccessDecision decision) => decision switch
     {
         ExpenseAccessDecision.Forbidden => ExpenseOperationStatus.Forbidden,
@@ -269,30 +330,20 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
             return ExpenseOperationResult.Failed(ExpenseOperationStatus.NotFound);
         }
 
-        ExpenseAccessDecision decision = ExpenseAccessPolicy.Decide(viewer, operation, expense.OwnerId, expense.Status);
-        if (decision != ExpenseAccessDecision.Allowed)
+        DateTime now = DateTime.UtcNow;
+        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(expense, viewer, operation, justification, now);
+        if (plan.Decision != ExpenseAccessDecision.Allowed || plan.History is null)
         {
-            return ExpenseOperationResult.Failed(ToFailureStatus(decision));
+            return ExpenseOperationResult.Failed(ToFailureStatus(plan.Decision));
         }
 
-        ExpenseTransition transition = ExpenseAccessPolicy.ToTransition(operation);
-        ExpenseStatus previous = expense.Status;
-        ExpenseWorkflow.TryTransition(previous, transition, out ExpenseStatus next);
-
-        DateTime now = DateTime.UtcNow;
-        expense.Status = next;
+        expense.Status = plan.NewStatus;
         expense.UpdatedAtUtc = now;
-
-        db.ExpenseHistories.Add(new ExpenseHistory
+        db.ExpenseHistories.Add(plan.History);
+        if (plan.Payment is not null)
         {
-            ExpenseId = expense.Id,
-            Action = ExpenseWorkflow.ActionName(transition),
-            ActorId = viewer.UserId,
-            OccurredAtUtc = now,
-            PreviousStatus = previous,
-            NewStatus = next,
-            Justification = justification,
-        });
+            db.PaymentRecords.Add(plan.Payment);
+        }
 
         if (!await TrySaveAsync(cancellationToken))
         {
@@ -330,6 +381,11 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
             return true;
         }
         catch (DbUpdateConcurrencyException)
+        {
+            db.ChangeTracker.Clear();
+            return false;
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqliteException { SqliteErrorCode: SqliteConstraintViolation })
         {
             db.ChangeTracker.Clear();
             return false;

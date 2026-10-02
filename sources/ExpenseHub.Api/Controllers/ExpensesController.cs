@@ -154,6 +154,44 @@ public sealed class ExpensesController(ExpenseService service) : ControllerBase
         return ToActionResult(result, StatusCodes.Status200OK);
     }
 
+    /// <summary>
+    /// Registra o pagamento simulado de um reembolso aprovado de outra pessoa (Approved para Paid).
+    /// </summary>
+    /// <param name="id">Identificador do reembolso.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>O reembolso pago.</returns>
+    [HttpPost("{id:guid}/pay")]
+    [Authorize(Roles = Roles.Finance)]
+    [ProducesResponseType<ExpenseResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ExpenseResponse>> Pay(Guid id, CancellationToken cancellationToken)
+    {
+        ExpenseOperationResult result = await service.PayAsync(id, CurrentViewer(), cancellationToken);
+        return ToActionResult(result, StatusCodes.Status200OK);
+    }
+
+    /// <summary>
+    /// Consulta o histórico de um reembolso, com a mesma visibilidade do reembolso.
+    /// </summary>
+    /// <param name="id">Identificador do reembolso.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Os registros em ordem cronológica.</returns>
+    [HttpGet("{id:guid}/history")]
+    [Authorize(Roles = ReadRoles)]
+    [ProducesResponseType<IReadOnlyList<ExpenseHistoryResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<ExpenseHistoryResponse>>> History(Guid id, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ExpenseHistoryResponse>? history = await service.GetHistoryAsync(id, CurrentViewer(), cancellationToken);
+        if (history is null)
+        {
+            return Problem(statusCode: StatusCodes.Status404NotFound, title: "Reembolso não encontrado.");
+        }
+
+        return Ok(history);
+    }
+
     private string CurrentUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
     private ExpenseViewer CurrentViewer() => new(

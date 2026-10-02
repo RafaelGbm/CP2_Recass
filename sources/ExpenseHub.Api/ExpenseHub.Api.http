@@ -178,3 +178,15 @@ Content-Type: application/json
 {
   "justification": "Não."
 }
+
+###
+
+@financeToken = cole-o-token-de-um-finance
+
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/pay
+Authorization: Bearer {{financeToken}}
+
+###
+
+GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/history
+Authorization: Bearer {{userToken}}
