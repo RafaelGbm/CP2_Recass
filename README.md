@@ -209,6 +209,16 @@ dotnet test ./sources/ExpenseHub.slnx
 
 Os testes unitários ficam em `sources/ExpenseHub.UnitTests` e rodam sem banco, rede ou serviço externo.
 
+### Roteiro de ponta a ponta
+
+Como evidência do fluxo completo, `scripts/e2e.sh` sobe a API com um banco SQLite e senhas temporários, executa 75 verificações de status HTTP e desliga a API no fim. Ele cobre os casos negativos obrigatórios da matriz de autorização, as validações, o fluxo `Draft` → `Submitted` → `Approved` → `Paid`, a reprovação, o histórico, a listagem por perfil e o novo login após troca de roles. O banco de desenvolvimento não é usado.
+
+```shell
+bash scripts/e2e.sh
+```
+
+Requer bash e curl (no Windows, use o Git Bash). O roteiro termina com código `0` quando todas as verificações passam. Ele é complementar: não substitui os testes unitários.
+
 ## Processo de desenvolvimento
 
 Cada issue do backlog central é implementada em uma branch própria (por exemplo `i03-user-roles`) e integrada por pull request, que cita a issue como `Racass/checkpoint-csharpracass-expensehub#N` e passa pelo workflow `code-quality`. O processo completo está em [PROCESSO-GITHUB.md](docs/PROCESSO-GITHUB.md).
