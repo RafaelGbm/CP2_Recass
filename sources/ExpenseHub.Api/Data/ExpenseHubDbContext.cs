@@ -55,7 +55,7 @@ public class ExpenseHubDbContext(DbContextOptions<ExpenseHubDbContext> options) 
             entity.Property(e => e.OwnerId).IsRequired().HasMaxLength(450);
             entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
             entity.Property(e => e.Amount).HasPrecision(18, 2);
-            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
             entity.HasOne(e => e.Category).WithMany().HasForeignKey(e => e.CategoryId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<IdentityUser>().WithMany().HasForeignKey(e => e.OwnerId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(e => e.OwnerId);

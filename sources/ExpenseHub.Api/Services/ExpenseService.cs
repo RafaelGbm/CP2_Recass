@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -134,9 +135,113 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
             Changes = changes,
         });
 
-        await db.SaveChangesAsync(cancellationToken);
+        if (!await TrySaveAsync(cancellationToken))
+        {
+            return ExpenseOperationResult.Failed(ExpenseOperationStatus.Conflict);
+        }
 
         return ExpenseOperationResult.Succeeded(ToResponse(expense, category.Name));
+    }
+
+    /// <summary>
+    /// Lista os reembolsos visíveis para o usuário, do mais recente para o mais antigo.
+    /// </summary>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Os reembolsos dentro do escopo de leitura.</returns>
+    public async Task<IReadOnlyList<ExpenseResponse>> ListAsync(ExpenseViewer viewer, CancellationToken cancellationToken)
+    {
+        List<Expense> expenses = await db.Expenses
+            .AsNoTracking()
+            .Include(e => e.Category)
+            .Where(ExpenseVisibility.VisibleTo(viewer))
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return [.. expenses.Select(expense => ToResponse(expense, expense.Category?.Name))];
+    }
+
+    /// <summary>
+    /// Consulta um reembolso dentro do escopo de leitura do usuário.
+    /// </summary>
+    /// <param name="expenseId">Reembolso consultado.</param>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>O reembolso; <see cref="ExpenseOperationStatus.NotFound"/> se não existir ou estiver fora do escopo.</returns>
+    public async Task<ExpenseOperationResult> GetAsync(
+        Guid expenseId,
+        ExpenseViewer viewer,
+        CancellationToken cancellationToken)
+    {
+        Expense? expense = await db.Expenses
+            .AsNoTracking()
+            .Include(e => e.Category)
+            .Where(ExpenseVisibility.VisibleTo(viewer))
+            .FirstOrDefaultAsync(e => e.Id == expenseId, cancellationToken);
+
+        return expense is null
+            ? ExpenseOperationResult.Failed(ExpenseOperationStatus.NotFound)
+            : ExpenseOperationResult.Succeeded(ToResponse(expense, expense.Category?.Name));
+    }
+
+    /// <summary>
+    /// Envia um rascunho do próprio usuário para aprovação e grava o histórico na mesma operação.
+    /// </summary>
+    /// <param name="expenseId">Reembolso enviado.</param>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    /// O reembolso em Submitted; <see cref="ExpenseOperationStatus.NotFound"/> se não existir ou estiver fora do escopo;
+    /// <see cref="ExpenseOperationStatus.Forbidden"/> se for visível mas de outro usuário;
+    /// <see cref="ExpenseOperationStatus.Conflict"/> se não estiver em Draft.
+    /// </returns>
+    public async Task<ExpenseOperationResult> SubmitAsync(
+        Guid expenseId,
+        ExpenseViewer viewer,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(viewer);
+
+        Expense? expense = await db.Expenses
+            .Include(e => e.Category)
+            .Where(ExpenseVisibility.VisibleTo(viewer))
+            .FirstOrDefaultAsync(e => e.Id == expenseId, cancellationToken);
+        if (expense is null)
+        {
+            return ExpenseOperationResult.Failed(ExpenseOperationStatus.NotFound);
+        }
+
+        if (!ExpenseWorkflow.SatisfiesOwnership(ExpenseTransition.Submit, expense.OwnerId == viewer.UserId))
+        {
+            return ExpenseOperationResult.Failed(ExpenseOperationStatus.Forbidden);
+        }
+
+        ExpenseStatus previous = expense.Status;
+        if (!ExpenseWorkflow.TryTransition(previous, ExpenseTransition.Submit, out ExpenseStatus next))
+        {
+            return ExpenseOperationResult.Failed(ExpenseOperationStatus.Conflict);
+        }
+
+        DateTime now = DateTime.UtcNow;
+        expense.Status = next;
+        expense.UpdatedAtUtc = now;
+
+        db.ExpenseHistories.Add(new ExpenseHistory
+        {
+            ExpenseId = expense.Id,
+            Action = ExpenseWorkflow.ActionName(ExpenseTransition.Submit),
+            ActorId = viewer.UserId,
+            OccurredAtUtc = now,
+            PreviousStatus = previous,
+            NewStatus = next,
+        });
+
+        if (!await TrySaveAsync(cancellationToken))
+        {
+            return ExpenseOperationResult.Failed(ExpenseOperationStatus.Conflict);
+        }
+
+        return ExpenseOperationResult.Succeeded(ToResponse(expense, expense.Category?.Name));
     }
 
     private static ExpenseResponse ToResponse(Expense expense, string? categoryName) => new()
@@ -152,6 +257,20 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
         CreatedAtUtc = expense.CreatedAtUtc,
         UpdatedAtUtc = expense.UpdatedAtUtc,
     };
+
+    private async Task<bool> TrySaveAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            db.ChangeTracker.Clear();
+            return false;
+        }
+    }
 
     private async Task<(bool Found, string? Name)> FindCategoryAsync(int? categoryId, CancellationToken cancellationToken)
     {
@@ -208,4 +327,7 @@ public enum ExpenseOperationStatus
 
     /// <summary>A categoria informada não existe (400).</summary>
     InvalidCategory = 3,
+
+    /// <summary>O reembolso é visível, mas o usuário não pode executar a operação sobre ele (403).</summary>
+    Forbidden = 4,
 }
