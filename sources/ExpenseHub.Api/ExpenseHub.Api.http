@@ -3,6 +3,7 @@
 # Cole aqui os tokens retornados por /login.
 @adminToken = cole-o-token-do-admin
 @userToken = cole-o-token-do-usuario
+@approverToken = cole-o-token-de-um-approver
 @userId = cole-o-id-do-usuario
 
 GET {{ExpenseHub_Api_HostAddress}}/health
@@ -143,6 +144,40 @@ Authorization: Bearer {{userToken}}
 
 GET {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
 Authorization: Bearer {{userToken}}
+
+###
+
+# Aprovação por um Approver que não é o dono: Submitted para Approved.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/approve
+Authorization: Bearer {{approverToken}}
+
+###
+
+# Aprovar de novo o mesmo reembolso: 409, sem novo histórico.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/approve
+Authorization: Bearer {{approverToken}}
+
+###
+
+# Reprovação com justificativa (10 a 500 caracteres): Submitted para Rejected.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/reject
+Authorization: Bearer {{approverToken}}
+Content-Type: application/json
+
+{
+  "justification": "Nota fiscal ilegível; envie uma nova cópia."
+}
+
+###
+
+# Reprovação com justificativa curta: 400.
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}/reject
+Authorization: Bearer {{approverToken}}
+Content-Type: application/json
+
+{
+  "justification": "Não."
+}
 
 ###
 

@@ -8,17 +8,19 @@ namespace ExpenseHub.Api.Domain;
 public static class ExpenseTransitionPlanner
 {
     /// <summary>
-    /// Decide a transição e monta o novo estado, o histórico e, no pagamento, o registro de pagamento.
+    /// Decide a transição e monta o novo estado, o histórico (com a justificativa, na reprovação) e, no pagamento, o registro de pagamento.
     /// </summary>
     /// <param name="expense">Reembolso visível para o usuário.</param>
     /// <param name="viewer">Usuário autenticado e suas roles.</param>
     /// <param name="operation">Operação de ação solicitada.</param>
+    /// <param name="justification">Justificativa da reprovação, já validada; ignorada nas outras transições.</param>
     /// <param name="nowUtc">Instante da operação, definido pelo servidor.</param>
     /// <returns>O plano permitido ou a recusa, sem histórico nem pagamento.</returns>
     public static ExpenseTransitionPlan Plan(
         Expense expense,
         ExpenseViewer viewer,
         ExpenseOperation operation,
+        string? justification,
         DateTime nowUtc)
     {
         ArgumentNullException.ThrowIfNull(expense);
@@ -41,6 +43,7 @@ public static class ExpenseTransitionPlanner
             OccurredAtUtc = nowUtc,
             PreviousStatus = expense.Status,
             NewStatus = next,
+            Justification = transition == ExpenseTransition.Reject ? justification : null,
         };
 
         PaymentRecord? payment = transition == ExpenseTransition.Pay

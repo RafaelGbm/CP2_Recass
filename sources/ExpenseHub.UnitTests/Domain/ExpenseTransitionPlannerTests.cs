@@ -23,7 +23,7 @@ public sealed class ExpenseTransitionPlannerTests
     {
         Expense expense = NewExpense(ExpenseStatus.Approved);
 
-        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(expense, Finance(FinanceUser), ExpenseOperation.Pay, _now);
+        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(expense, Finance(FinanceUser), ExpenseOperation.Pay, null, _now);
 
         Assert.AreEqual(ExpenseAccessDecision.Allowed, plan.Decision);
         Assert.AreEqual(ExpenseStatus.Paid, plan.NewStatus);
@@ -53,7 +53,7 @@ public sealed class ExpenseTransitionPlannerTests
     [DataRow(ExpenseStatus.Paid)]
     public void Plan_PayOutsideApproved_IsConflictWithNothingToSave(ExpenseStatus status)
     {
-        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(NewExpense(status), Finance(FinanceUser), ExpenseOperation.Pay, _now);
+        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(NewExpense(status), Finance(FinanceUser), ExpenseOperation.Pay, null, _now);
 
         AssertRefused(plan, ExpenseAccessDecision.Conflict, status);
     }
@@ -66,7 +66,7 @@ public sealed class ExpenseTransitionPlannerTests
     {
         ExpenseViewer employeeAndFinance = new(Owner, true, false, true, false);
 
-        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(NewExpense(ExpenseStatus.Approved), employeeAndFinance, ExpenseOperation.Pay, _now);
+        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(NewExpense(ExpenseStatus.Approved), employeeAndFinance, ExpenseOperation.Pay, null, _now);
 
         AssertRefused(plan, ExpenseAccessDecision.Forbidden, ExpenseStatus.Approved);
     }
@@ -79,7 +79,7 @@ public sealed class ExpenseTransitionPlannerTests
     {
         ExpenseViewer auditor = new("auditor", false, false, false, true);
 
-        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(NewExpense(ExpenseStatus.Approved), auditor, ExpenseOperation.Pay, _now);
+        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(NewExpense(ExpenseStatus.Approved), auditor, ExpenseOperation.Pay, null, _now);
 
         AssertRefused(plan, ExpenseAccessDecision.Forbidden, ExpenseStatus.Approved);
     }
@@ -92,7 +92,7 @@ public sealed class ExpenseTransitionPlannerTests
     {
         ExpenseViewer owner = new(Owner, true, false, false, false);
 
-        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(NewExpense(ExpenseStatus.Draft), owner, ExpenseOperation.Submit, _now);
+        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(NewExpense(ExpenseStatus.Draft), owner, ExpenseOperation.Submit, null, _now);
 
         Assert.AreEqual(ExpenseStatus.Submitted, plan.NewStatus);
         Assert.IsNotNull(plan.History);
@@ -109,9 +109,51 @@ public sealed class ExpenseTransitionPlannerTests
     {
         Expense expense = NewExpense(ExpenseStatus.Approved);
 
-        ExpenseTransitionPlanner.Plan(expense, Finance(FinanceUser), ExpenseOperation.Pay, _now);
+        ExpenseTransitionPlanner.Plan(expense, Finance(FinanceUser), ExpenseOperation.Pay, null, _now);
 
         Assert.AreEqual(ExpenseStatus.Approved, expense.Status);
+    }
+
+    /// <summary>
+    /// A reprovação grava a justificativa no histórico, sem registro de pagamento.
+    /// </summary>
+    [TestMethod]
+    public void Plan_Reject_RecordsJustificationInHistory()
+    {
+        ExpenseViewer approver = new("approver", false, true, false, false);
+
+        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(
+            NewExpense(ExpenseStatus.Submitted),
+            approver,
+            ExpenseOperation.Reject,
+            "Nota fiscal ilegível; envie uma nova cópia.",
+            _now);
+
+        Assert.AreEqual(ExpenseStatus.Rejected, plan.NewStatus);
+        Assert.IsNotNull(plan.History);
+        Assert.AreEqual(ExpenseActions.Rejected, plan.History.Action);
+        Assert.AreEqual("Nota fiscal ilegível; envie uma nova cópia.", plan.History.Justification);
+        Assert.IsNull(plan.Payment);
+    }
+
+    /// <summary>
+    /// Fora da reprovação, uma justificativa recebida por engano não é gravada.
+    /// </summary>
+    [TestMethod]
+    public void Plan_Approve_IgnoresJustification()
+    {
+        ExpenseViewer approver = new("approver", false, true, false, false);
+
+        ExpenseTransitionPlan plan = ExpenseTransitionPlanner.Plan(
+            NewExpense(ExpenseStatus.Submitted),
+            approver,
+            ExpenseOperation.Approve,
+            "Texto que não deveria ir para o histórico.",
+            _now);
+
+        Assert.AreEqual(ExpenseStatus.Approved, plan.NewStatus);
+        Assert.IsNotNull(plan.History);
+        Assert.IsNull(plan.History.Justification);
     }
 
     private static ExpenseViewer Finance(string userId) => new(userId, false, false, true, false);
