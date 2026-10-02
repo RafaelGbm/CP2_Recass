@@ -4,6 +4,30 @@ API REST de reembolsos corporativos, desenvolvida para o Checkpoint 2 de C# (FIA
 
 A especificação completa está em [`docs/`](docs/) e nas issues do repositório original [`Racass/checkpoint-csharpracass-expensehub`](https://github.com/Racass/checkpoint-csharpracass-expensehub/issues).
 
+## Integrantes
+
+| Nome | RM | GitHub |
+|---|---|---|
+| Rafael Gaspar Bragança Martins | 557228 | [@RafaelGbm](https://github.com/RafaelGbm) |
+| Vinícius Monteiro Araújo | 555088 | [@Monteiro77](https://github.com/Monteiro77) |
+
+## Issues implementadas
+
+| Issue | Pull request | Responsável |
+|---|---|---|
+| I01 — Fundação da solução e Entity Framework Core | [#1](https://github.com/RafaelGbm/CP2_Recass/pull/1) | Rafael |
+| I02 — Identity, Admin e autenticação | [#2](https://github.com/RafaelGbm/CP2_Recass/pull/2) | Rafael |
+| I03 — Cadastro HTTP e gerenciamento de roles | [#3](https://github.com/RafaelGbm/CP2_Recass/pull/3) | Rafael |
+| Ajustes de conformidade das issues I01 a I03 | [#4](https://github.com/RafaelGbm/CP2_Recass/pull/4) | Rafael |
+| I04 — Criar e editar rascunho | [#5](https://github.com/RafaelGbm/CP2_Recass/pull/5) | Vinícius |
+| I05 — Enviar, listar e consultar | [#6](https://github.com/RafaelGbm/CP2_Recass/pull/6) | Vinícius |
+| I06 — Ownership e matriz de acesso | [#7](https://github.com/RafaelGbm/CP2_Recass/pull/7) | Vinícius |
+| I07 — Aprovar e reprovar com justificativa | [#9](https://github.com/RafaelGbm/CP2_Recass/pull/9) | Rafael |
+| I08 — Pagamento e histórico | [#8](https://github.com/RafaelGbm/CP2_Recass/pull/8) | Vinícius |
+| I09 — Testes unitários | Em cada PR acima | Ambos |
+| I10 — Qualidade de código | Workflow `code-quality` em cada PR | Ambos |
+| Roteiro de ponta a ponta (evidência) | [#10](https://github.com/RafaelGbm/CP2_Recass/pull/10) | Rafael |
+
 ## Tecnologias
 
 - .NET 10 e ASP.NET Core (controllers)
