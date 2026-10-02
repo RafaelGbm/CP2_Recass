@@ -111,6 +111,49 @@ public sealed class ExpensesController(ExpenseService service) : ControllerBase
         return ToActionResult(result, StatusCodes.Status200OK);
     }
 
+    /// <summary>
+    /// Aprova um reembolso enviado por outra pessoa (Submitted para Approved).
+    /// </summary>
+    /// <param name="id">Identificador do reembolso.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>O reembolso aprovado.</returns>
+    [HttpPost("{id:guid}/approve")]
+    [Authorize(Roles = Roles.Approver)]
+    [ProducesResponseType<ExpenseResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ExpenseResponse>> Approve(Guid id, CancellationToken cancellationToken)
+    {
+        ExpenseOperationResult result = await service.ApproveAsync(id, CurrentViewer(), cancellationToken);
+        return ToActionResult(result, StatusCodes.Status200OK);
+    }
+
+    /// <summary>
+    /// Reprova um reembolso enviado por outra pessoa (Submitted para Rejected), com justificativa obrigatória.
+    /// </summary>
+    /// <param name="id">Identificador do reembolso.</param>
+    /// <param name="request">Justificativa da reprovação.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>O reembolso reprovado.</returns>
+    [HttpPost("{id:guid}/reject")]
+    [Authorize(Roles = Roles.Approver)]
+    [ProducesResponseType<ExpenseResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ExpenseResponse>> Reject(
+        Guid id,
+        [FromBody] RejectExpenseRequest request,
+        CancellationToken cancellationToken)
+    {
+        ExpenseOperationResult result = await service.RejectAsync(
+            id,
+            CurrentViewer(),
+            request.Justification,
+            cancellationToken);
+        return ToActionResult(result, StatusCodes.Status200OK);
+    }
+
     private string CurrentUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
     private ExpenseViewer CurrentViewer() => new(

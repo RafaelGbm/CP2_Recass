@@ -201,7 +201,43 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
         Guid expenseId,
         ExpenseViewer viewer,
         CancellationToken cancellationToken) =>
-        TransitionAsync(expenseId, viewer, ExpenseOperation.Submit, cancellationToken);
+        TransitionAsync(expenseId, viewer, ExpenseOperation.Submit, null, cancellationToken);
+
+    /// <summary>
+    /// Aprova um reembolso enviado por outra pessoa e grava o histórico na mesma operação.
+    /// </summary>
+    /// <param name="expenseId">Reembolso aprovado.</param>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    /// O reembolso em Approved; <see cref="ExpenseOperationStatus.NotFound"/> se não existir ou ainda estiver em Draft;
+    /// <see cref="ExpenseOperationStatus.Forbidden"/> se o usuário for o dono;
+    /// <see cref="ExpenseOperationStatus.Conflict"/> se não estiver em Submitted, inclusive quando já foi decidido.
+    /// </returns>
+    public Task<ExpenseOperationResult> ApproveAsync(
+        Guid expenseId,
+        ExpenseViewer viewer,
+        CancellationToken cancellationToken) =>
+        TransitionAsync(expenseId, viewer, ExpenseOperation.Approve, null, cancellationToken);
+
+    /// <summary>
+    /// Reprova um reembolso enviado por outra pessoa, guardando a justificativa no histórico na mesma operação.
+    /// </summary>
+    /// <param name="expenseId">Reembolso reprovado.</param>
+    /// <param name="viewer">Usuário autenticado e suas roles.</param>
+    /// <param name="justification">Justificativa da reprovação, já validada.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    /// O reembolso em Rejected; <see cref="ExpenseOperationStatus.NotFound"/> se não existir ou ainda estiver em Draft;
+    /// <see cref="ExpenseOperationStatus.Forbidden"/> se o usuário for o dono;
+    /// <see cref="ExpenseOperationStatus.Conflict"/> se não estiver em Submitted, inclusive quando já foi decidido.
+    /// </returns>
+    public Task<ExpenseOperationResult> RejectAsync(
+        Guid expenseId,
+        ExpenseViewer viewer,
+        string justification,
+        CancellationToken cancellationToken) =>
+        TransitionAsync(expenseId, viewer, ExpenseOperation.Reject, justification, cancellationToken);
 
     private static ExpenseOperationStatus ToFailureStatus(ExpenseAccessDecision decision) => decision switch
     {
@@ -214,11 +250,20 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
         Guid expenseId,
         ExpenseViewer viewer,
         ExpenseOperation operation,
+        string? justification,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(viewer);
 
         Expense? expense = await FindVisibleAsync(expenseId, viewer, cancellationToken);
+        if (expense is null && operation != ExpenseOperation.Submit)
+        {
+            expense = await db.Expenses
+                .Include(e => e.Category)
+                .Where(ExpenseVisibility.ActionableBy(viewer, operation))
+                .FirstOrDefaultAsync(e => e.Id == expenseId, cancellationToken);
+        }
+
         if (expense is null)
         {
             return ExpenseOperationResult.Failed(ExpenseOperationStatus.NotFound);
@@ -246,6 +291,7 @@ public sealed class ExpenseService(ExpenseHubDbContext db)
             OccurredAtUtc = now,
             PreviousStatus = previous,
             NewStatus = next,
+            Justification = justification,
         });
 
         if (!await TrySaveAsync(cancellationToken))
