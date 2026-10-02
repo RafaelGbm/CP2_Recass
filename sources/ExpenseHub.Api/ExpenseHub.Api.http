@@ -86,3 +86,45 @@ Content-Type: application/json
 {
   "roles": ["SuperUser"]
 }
+
+###
+
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "description": "Táxi do aeroporto ao hotel",
+  "amount": 85.50,
+  "expenseDate": "2026-09-20",
+  "categoryId": 1
+}
+
+###
+
+POST {{ExpenseHub_Api_HostAddress}}/api/expenses
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "description": "Táxi do aeroporto ao hotel",
+  "amount": 85.50,
+  "expenseDate": "2026-09-20",
+  "ownerId": "outro-usuario",
+  "status": "Approved"
+}
+
+###
+
+@expenseId = cole-o-id-do-reembolso
+
+PUT {{ExpenseHub_Api_HostAddress}}/api/expenses/{{expenseId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "description": "Táxi do aeroporto ao hotel (ida e volta)",
+  "amount": 171.00,
+  "expenseDate": "2026-09-20",
+  "categoryId": 1
+}
