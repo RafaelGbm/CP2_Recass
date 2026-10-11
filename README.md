@@ -1,8 +1,14 @@
 # ExpenseHub
 
-API REST de reembolsos corporativos, desenvolvida para o Checkpoint 2 de C# (FIAP). Funcionários registram despesas, aprovadores analisam os pedidos, o financeiro registra pagamentos e auditores consultam o histórico.
+![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)
+![SQLite](https://img.shields.io/badge/banco-SQLite-003B57?logo=sqlite&logoColor=white)
+[![code-quality](https://github.com/RafaelGbm/CP2_Recass/actions/workflows/build.yml/badge.svg)](https://github.com/RafaelGbm/CP2_Recass/actions/workflows/build.yml)
 
-A especificação completa está em [`docs/`](docs/) e nas issues do repositório original [`Racass/checkpoint-csharpracass-expensehub`](https://github.com/Racass/checkpoint-csharpracass-expensehub/issues).
+API REST de reembolsos corporativos, desenvolvida para o Checkpoint 2 de C# (FIAP).
+
+Funcionários registram despesas, aprovadores analisam os pedidos, o financeiro registra pagamentos e auditores consultam o histórico. Cada operação considera a identidade autenticada, as roles, o proprietário do reembolso e o estado atual.
+
+> Especificação completa em [`docs/`](docs/) e nas issues de [`Racass/checkpoint-csharpracass-expensehub`](https://github.com/Racass/checkpoint-csharpracass-expensehub/issues).
 
 ## Integrantes
 
@@ -11,148 +17,133 @@ A especificação completa está em [`docs/`](docs/) e nas issues do repositóri
 | Rafael Gaspar Bragança Martins | 557228 | [@RafaelGbm](https://github.com/RafaelGbm) |
 | Vinícius Monteiro Araújo | 555088 | [@Monteiro77](https://github.com/Monteiro77) |
 
-## Issues implementadas
+## Sumário
 
-| Issue | Pull request | Responsável |
-|---|---|---|
-| I01 — Fundação da solução e Entity Framework Core | [#1](https://github.com/RafaelGbm/CP2_Recass/pull/1) | Rafael |
-| I02 — Identity, Admin e autenticação | [#2](https://github.com/RafaelGbm/CP2_Recass/pull/2) | Rafael |
-| I03 — Cadastro HTTP e gerenciamento de roles | [#3](https://github.com/RafaelGbm/CP2_Recass/pull/3) | Rafael |
-| Ajustes de conformidade das issues I01 a I03 | [#4](https://github.com/RafaelGbm/CP2_Recass/pull/4) | Rafael |
-| I04 — Criar e editar rascunho | [#5](https://github.com/RafaelGbm/CP2_Recass/pull/5) | Vinícius |
-| I05 — Enviar, listar e consultar | [#6](https://github.com/RafaelGbm/CP2_Recass/pull/6) | Vinícius |
-| I06 — Ownership e matriz de acesso | [#7](https://github.com/RafaelGbm/CP2_Recass/pull/7) | Vinícius |
-| I07 — Aprovar e reprovar com justificativa | [#9](https://github.com/RafaelGbm/CP2_Recass/pull/9) | Rafael |
-| I08 — Pagamento e histórico | [#8](https://github.com/RafaelGbm/CP2_Recass/pull/8) | Vinícius |
-| I09 — Testes unitários | Em cada PR acima | Ambos |
-| I10 — Qualidade de código | Workflow `code-quality` em cada PR | Ambos |
-| Roteiro de ponta a ponta (evidência) | [#10](https://github.com/RafaelGbm/CP2_Recass/pull/10) | Rafael |
+- [Tecnologias](#tecnologias)
+- [Como executar](#como-executar)
+- [Banco de dados](#banco-de-dados)
+- [Fluxo do reembolso](#fluxo-do-reembolso)
+- [Autenticação e roles](#autenticação-e-roles)
+- [Endpoints](#endpoints)
+- [Regras de acesso](#regras-de-acesso)
+- [Respostas de erro](#respostas-de-erro)
+- [Testes](#testes)
+- [Issues e pull requests](#issues-e-pull-requests)
 
 ## Tecnologias
 
-- .NET 10 e ASP.NET Core (controllers)
-- ASP.NET Core Identity com autenticação por token bearer
-- Entity Framework Core com SQLite
-- MSTest para os testes unitários
-
-## Estrutura
-
-```text
-sources/
-├── ExpenseHub.slnx
-├── ExpenseHub.Api/
-│   ├── Auth/          roles, seed do Admin e regras de roles
-│   ├── Controllers/   endpoints HTTP
-│   ├── Data/          DbContext e conversões
-│   ├── Domain/        entidades e estados do reembolso
-│   ├── Dtos/          contratos de entrada e saída, com validação
-│   ├── Migrations/    migrations do Entity Framework Core
-│   ├── Services/      regras de negócio usadas pelos controllers
-│   └── Validation/    atributos de validação próprios
-└── ExpenseHub.UnitTests/
-```
+| | |
+|---|---|
+| **API** | .NET 10 e ASP.NET Core (controllers) |
+| **Autenticação** | ASP.NET Core Identity com token bearer |
+| **Persistência** | Entity Framework Core 10 com SQLite |
+| **Testes** | MSTest |
+| **Qualidade** | StyleCop, analisadores do .NET e workflow `code-quality` |
 
 ## Como executar
 
-Pré-requisito: [.NET SDK 10](https://dotnet.microsoft.com/download).
+**Pré-requisito:** [.NET SDK 10](https://dotnet.microsoft.com/download). Os comandos são executados na raiz do repositório.
 
-1. Restaure as dependências e as ferramentas locais:
+```shell
+# 1. Dependências e ferramentas locais (dotnet-ef)
+dotnet restore ./sources/ExpenseHub.slnx
+dotnet tool restore
 
-   ```shell
-   dotnet restore ./sources/ExpenseHub.slnx
-   dotnet tool restore
-   ```
+# 2. Senha da conta Admin inicial (fica fora do repositório, nos User Secrets)
+dotnet user-secrets set "Seed:AdminPassword" "<sua-senha>" --project ./sources/ExpenseHub.Api
 
-2. Configure a senha da conta Admin inicial (veja [Conta Admin inicial](#conta-admin-inicial)):
+# 3. Build, testes e execução
+dotnet build ./sources/ExpenseHub.slnx
+dotnet test ./sources/ExpenseHub.slnx
+dotnet run --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj
+```
 
-   ```shell
-   dotnet user-secrets set "Seed:AdminPassword" "<sua-senha>" --project ./sources/ExpenseHub.Api
-   ```
+A API sobe em `http://localhost:5245` e responde `{"status":"ok"}` em `GET /health`. Na primeira execução, ela cria o banco, as roles e a conta Admin.
 
-3. Compile, rode os testes e inicie a API:
-
-   ```shell
-   dotnet build ./sources/ExpenseHub.slnx
-   dotnet test ./sources/ExpenseHub.slnx
-   dotnet run --project ./sources/ExpenseHub.Api/ExpenseHub.Api.csproj
-   ```
-
-A API sobe em `http://localhost:5245`. Confirme com `GET /health`, que responde `{"status":"ok"}`.
-
-O arquivo [`ExpenseHub.Api.http`](sources/ExpenseHub.Api/ExpenseHub.Api.http) traz as requisições prontas para o VS Code (extensão REST Client) ou o Visual Studio.
+As requisições prontas estão em [`ExpenseHub.Api.http`](sources/ExpenseHub.Api/ExpenseHub.Api.http) (VS Code com REST Client, ou Visual Studio).
 
 ## Banco de dados
 
-- **Provider e pacote:** SQLite, com `Microsoft.EntityFrameworkCore.Sqlite` (10.0.12). O pacote `Microsoft.EntityFrameworkCore.Design` é usado apenas pelas migrations.
-- **Configuração:** a connection string fica em `ConnectionStrings:ExpenseHub` no `appsettings.json` (`Data Source=expensehub.db`) e não contém segredos. O arquivo do banco é criado na pasta de execução da API. Para usar outro caminho, defina a variável de ambiente `ConnectionStrings__ExpenseHub`.
-- **Criação e atualização:** ao iniciar, a API aplica as migrations pendentes e executa o seed. Para aplicar as migrations manualmente, use a ferramenta local `dotnet-ef`, declarada em `dotnet-tools.json`:
-
-  ```shell
-  dotnet dotnet-ef database update --project ./sources/ExpenseHub.Api
-  ```
-
-- **Nova migration** depois de alterar as entidades:
-
-  ```shell
-  dotnet dotnet-ef migrations add NomeDaMigration --project ./sources/ExpenseHub.Api --output-dir Migrations
-  ```
-
-Os arquivos `*.db`, `*.db-shm` e `*.db-wal` estão no `.gitignore`. O build e os testes unitários não dependem do banco.
-
-### Entidades
-
-| Entidade | Papel |
+| | |
 |---|---|
-| `Expense` | Reembolso com proprietário, descrição, valor, data da despesa, categoria opcional, estado e datas de criação e alteração |
-| `ExpenseCategory` | Categoria do reembolso. A migration inicial cria quatro categorias de referência: Transporte, Alimentação, Hospedagem e Outros |
-| `ExpenseHistory` | Histórico: ação, reembolso, ator, instante, estado anterior e posterior, justificativa da reprovação e alterações feitas em Draft (`Changes`) |
-| `PaymentRecord` | Pagamento simulado, com ator e instante; no máximo um por reembolso |
+| **Provider** | SQLite, com `Microsoft.EntityFrameworkCore.Sqlite` 10.0.12 |
+| **Connection string** | `ConnectionStrings:ExpenseHub` no `appsettings.json` (`Data Source=expensehub.db`), sem segredos. Pode ser trocada pela variável `ConnectionStrings__ExpenseHub` |
+| **Criação e atualização** | Automáticas ao iniciar a API, em qualquer ambiente: as migrations pendentes são aplicadas e o seed é executado |
+| **Arquivo** | `sources/ExpenseHub.Api/expensehub.db`, ignorado pelo Git. Para recomeçar do zero, pare a API e apague o arquivo |
 
-- Os estados (`ExpenseStatus`) são gravados como texto: `Draft`, `Submitted`, `Approved`, `Rejected` e `Paid`.
-- Todos os instantes são gravados e devolvidos em UTC.
-- Proprietário, ator do histórico e responsável pelo pagamento são chaves estrangeiras para o usuário do Identity.
+Para aplicar as migrations manualmente ou criar uma nova:
 
-## Autenticação e conta Admin
+```shell
+dotnet dotnet-ef database update --project ./sources/ExpenseHub.Api
+dotnet dotnet-ef migrations add NomeDaMigration --project ./sources/ExpenseHub.Api --output-dir Migrations
+```
 
-### Roles
+<details>
+<summary><b>Entidades</b></summary>
 
-`Admin`, `Employee`, `Approver`, `Finance` e `Auditor`. O seed cria as que faltarem ao iniciar a aplicação; nenhuma outra role é criada.
+| Entidade | Campos principais |
+|---|---|
+| `Expense` | `Id`, `OwnerId`, `Description`, `Amount` (`decimal`), `ExpenseDate`, `CategoryId` (opcional), `Status`, `CreatedAtUtc`, `UpdatedAtUtc` |
+| `ExpenseCategory` | `Id`, `Name`. Categorias de referência: 1 Transporte, 2 Alimentação, 3 Hospedagem, 4 Outros |
+| `ExpenseHistory` | `Action`, `ActorId`, `OccurredAtUtc`, `PreviousStatus`, `NewStatus`, `Justification`, `Changes` |
+| `PaymentRecord` | `ExpenseId` (único), `PaidById`, `PaidAtUtc` |
 
-### Conta Admin inicial
+- Um único valor por reembolso, sem coleção de itens.
+- Estados gravados como texto; instantes gravados e devolvidos em UTC.
+- O estado do reembolso é token de concorrência: duas alterações simultâneas não geram dois históricos.
 
-O seed cria **uma única** conta Admin, vinculada à role `Admin`, e nenhum outro usuário. Ele pode ser executado várias vezes sem duplicar roles nem usuários: se já existir um usuário com a role Admin, nada é criado.
+</details>
 
-- O e-mail vem de `Seed:AdminEmail` no `appsettings.json` (`admin@expensehub.local`).
-- A senha **não fica no repositório**. Configure com User Secrets ou com a variável de ambiente `Seed__AdminPassword`. Ela segue a política padrão do Identity: pelo menos 6 caracteres, com letra maiúscula, minúscula, número e símbolo.
-- Sem senha configurada, a API inicia, registra um aviso no log e não cria o Admin.
-- A conta Admin só é criada uma vez. Trocar o secret depois não altera a senha já gravada; para recriar, apague o arquivo `expensehub.db` e inicie a API de novo.
+## Fluxo do reembolso
 
-### Login
+```mermaid
+stateDiagram-v2
+    [*] --> Draft: criar (Employee)
+    Draft --> Draft: editar (proprietário)
+    Draft --> Submitted: enviar (proprietário)
+    Submitted --> Approved: aprovar (Approver, exceto o proprietário)
+    Submitted --> Rejected: reprovar com justificativa (Approver, exceto o proprietário)
+    Approved --> Paid: pagar (Finance, exceto o proprietário)
+    Rejected --> [*]
+    Paid --> [*]
+```
+
+- `Rejected` e `Paid` são finais. Não existem reabertura, cancelamento, exclusão ou reenvio.
+- O estado nunca vem do cliente: muda apenas pelas rotas de ação.
+- Repetir uma transição, ou tentá-la fora do estado esperado, responde `409` e não grava histórico.
+- Toda ação grava o histórico (ator, instante UTC, estado anterior e posterior) na mesma operação da alteração. A edição registra o que mudou em `changes` (`amount: 85.50 -> 171.00`), e a reprovação guarda a justificativa.
+
+## Autenticação e roles
+
+| Role | Pode |
+|---|---|
+| `Employee` | Criar, editar, enviar e consultar os próprios reembolsos |
+| `Approver` | Consultar os enviados e aprovar ou reprovar os de outras pessoas |
+| `Finance` | Consultar os aprovados e pagos e pagar os de outras pessoas |
+| `Auditor` | Consultar todos os reembolsos e históricos, sem alterar nada |
+| `Admin` | Listar usuários e alterar roles, sem acesso aos reembolsos |
+
+**Conta Admin inicial.** O seed cria as cinco roles e **uma única** conta Admin (`admin@expensehub.local`), e pode rodar várias vezes sem duplicar nada. A senha vem de `Seed:AdminPassword` (User Secrets ou variável `Seed__AdminPassword`) e nunca fica no código. Sem ela, a API inicia e registra um aviso, mas não cria o Admin.
+
+**Login.** `POST /login` com e-mail e senha devolve um `accessToken` válido por 1 hora. Envie-o como `Authorization: Bearer <token>`.
+
+**Cadastro.** `POST /register` cria o usuário **sem nenhuma role** e recusa qualquer campo além de `email` e `password`. As roles são atribuídas só pelo Admin.
+
+> **Novo login após troca de roles.** Quando o Admin altera as roles de um usuário, os tokens emitidos antes passam a receber `401`. O usuário precisa fazer login de novo para receber um token com as roles atuais.
+
+<details>
+<summary><b>Exemplos: login, cadastro e troca de roles</b></summary>
 
 ```http
 POST /login
 Content-Type: application/json
 
-{ "email": "admin@expensehub.local", "password": "<sua-senha>" }
+{ "email": "admin@expensehub.local", "password": "<senha>" }
 ```
 
-A resposta traz `accessToken`, válido por 1 hora. Envie-o nas rotas protegidas no cabeçalho `Authorization: Bearer <accessToken>`.
-
-### Respostas de erro
-
-Os erros usam `ProblemDetails`:
-
-| Status | Quando |
-|---|---|
-| 400 | Entrada inválida |
-| 401 | Sem token, token inválido, expirado ou emitido antes de uma alteração de roles; credenciais erradas no login |
-| 403 | Autenticado, mas sem permissão para a operação |
-| 404 | Recurso inexistente ou fora do escopo de leitura |
-| 409 | Transição de estado incompatível ou repetida |
-
-## Cadastro e gerenciamento de roles
-
-### Cadastro
+```json
+{ "tokenType": "Bearer", "accessToken": "<token>", "expiresIn": 3600, "refreshToken": "<token>" }
+```
 
 ```http
 POST /register
@@ -161,51 +152,61 @@ Content-Type: application/json
 { "email": "ana@empresa.com", "password": "<senha>" }
 ```
 
-- Cria o usuário **sem nenhuma role** e responde `201` com id, e-mail e `roles: []`.
-- O cadastro **não aceita roles**: qualquer campo além de `email` e `password` (por exemplo `"roles"`) é recusado com `400`.
-- E-mail inválido, e-mail já cadastrado ou senha fora da política do Identity também respondem `400`.
-
-Enquanto não receber roles do Admin, o usuário consegue fazer login, mas recebe `403` nas operações protegidas.
-
-### Rotas do Admin
-
-Exigem token de um usuário com a role `Admin`: sem token, `401`; com token sem Admin, `403`.
-
-| Método | Rota | Descrição |
-|---|---|---|
-| GET | `/api/admin/users` | Lista usuários com suas roles |
-| PUT | `/api/admin/users/{id}/roles` | Substitui as roles do usuário pelo conjunto enviado |
+```json
+{ "id": "5686acf2-997c-4d19-ac0a-0e6d34a8b1f2", "email": "ana@empresa.com", "roles": [] }
+```
 
 ```http
 PUT /api/admin/users/{id}/roles
 Authorization: Bearer <token do Admin>
 Content-Type: application/json
 
-{ "roles": ["Employee", "Approver"] }
+{ "roles": ["Employee"] }
 ```
 
-- O corpo é o **conjunto completo** desejado: roles ausentes são removidas e uma lista vazia remove todas.
-- Só as cinco roles conhecidas são aceitas, escritas exatamente como acima. Uma role desconhecida responde `400` e nada é alterado; nenhuma role nova é criada.
-- O Admin não pode remover a própria role Admin: a requisição responde `400` e nada é alterado.
-- Usuário inexistente responde `404`.
+```json
+{ "id": "5686acf2-997c-4d19-ac0a-0e6d34a8b1f2", "email": "ana@empresa.com", "roles": ["Employee"] }
+```
 
-> **Novo login obrigatório:** depois de uma alteração de roles, os tokens emitidos antes dela passam a receber `401`. O usuário precisa fazer login de novo para receber um token com as roles atuais.
+- O corpo é o conjunto completo de roles: as ausentes são removidas.
+- Só as cinco roles conhecidas, com o nome exato. Role desconhecida responde `400`.
+- O Admin não pode remover a própria role Admin (`400`).
+- A senha segue a política padrão do Identity: 6 caracteres ou mais, com maiúscula, minúscula, número e símbolo.
 
-## Reembolsos
+</details>
 
-Exigem token: sem token, `401`; com token sem a role exigida, `403`. Dono, estado, ator e horários são sempre definidos pelo servidor.
+## Endpoints
 
-| Método | Rota | Role | Descrição |
-|---|---|---|---|
-| POST | `/api/expenses` | Employee | Cria um rascunho (`Draft`) do usuário autenticado; responde `201` |
-| PUT | `/api/expenses/{id}` | Employee | Edita o próprio rascunho; responde `200` |
-| POST | `/api/expenses/{id}/submit` | Employee | Envia o próprio rascunho (`Draft` para `Submitted`); responde `200` |
-| GET | `/api/expenses` | Employee, Approver, Finance, Auditor | Lista os reembolsos visíveis, do mais recente para o mais antigo |
-| GET | `/api/expenses/{id}` | Employee, Approver, Finance, Auditor | Consulta um reembolso visível |
-| POST | `/api/expenses/{id}/approve` | Approver | Aprova um reembolso enviado por outra pessoa (`Submitted` para `Approved`); responde `200` |
-| POST | `/api/expenses/{id}/reject` | Approver | Reprova um reembolso enviado por outra pessoa (`Submitted` para `Rejected`), com justificativa; responde `200` |
-| POST | `/api/expenses/{id}/pay` | Finance | Registra o pagamento de um reembolso aprovado de outra pessoa (`Approved` para `Paid`); responde `200` |
-| GET | `/api/expenses/{id}/history` | Employee, Approver, Finance, Auditor | Histórico do reembolso, em ordem cronológica, com a mesma visibilidade do reembolso |
+| Método | Rota | Quem acessa | Sucesso |
+|---|---|---|:---:|
+| `POST` | `/register` | público | `201` |
+| `POST` | `/login` | público | `200` |
+| `GET` | `/api/admin/users` | Admin | `200` |
+| `PUT` | `/api/admin/users/{id}/roles` | Admin | `200` |
+| `POST` | `/api/expenses` | Employee | `201` |
+| `PUT` | `/api/expenses/{id}` | Employee (proprietário, em `Draft`) | `200` |
+| `POST` | `/api/expenses/{id}/submit` | Employee (proprietário, em `Draft`) | `200` |
+| `GET` | `/api/expenses` | Employee, Approver, Finance, Auditor | `200` |
+| `GET` | `/api/expenses/{id}` | Employee, Approver, Finance, Auditor | `200` |
+| `POST` | `/api/expenses/{id}/approve` | Approver (não proprietário, em `Submitted`) | `200` |
+| `POST` | `/api/expenses/{id}/reject` | Approver (não proprietário, em `Submitted`) | `200` |
+| `POST` | `/api/expenses/{id}/pay` | Finance (não proprietário, em `Approved`) | `200` |
+| `GET` | `/api/expenses/{id}/history` | Employee, Approver, Finance, Auditor | `200` |
+
+**Validação de criação e edição:**
+
+| Campo | Regra |
+|---|---|
+| `description` | Obrigatória, de 10 a 500 caracteres |
+| `amount` | Obrigatório, de `0.01` a `2147483647` (`Int32.MaxValue`) |
+| `expenseDate` | Obrigatória (`yyyy-MM-dd`) e não futura, considerando o dia em Brasília |
+| `categoryId` | Opcional; quando informada, precisa existir |
+| `justification` (reprovação) | Obrigatória, de 10 a 500 caracteres |
+
+Campos controlados pelo servidor, como `ownerId`, `status`, `createdAtUtc` ou `actorId`, são recusados com `400`.
+
+<details>
+<summary><b>Exemplo: criar um reembolso</b></summary>
 
 ```http
 POST /api/expenses
@@ -215,39 +216,119 @@ Content-Type: application/json
 { "description": "Táxi do aeroporto ao hotel", "amount": 85.50, "expenseDate": "2026-09-20", "categoryId": 1 }
 ```
 
-- **Validação (`400`):** descrição entre 10 e 500 caracteres; valor entre `0.01` e `2147483647`; data no formato `yyyy-MM-dd`, não futura em relação ao dia corrente em Brasília; `categoryId` opcional, mas precisa existir (1 Transporte, 2 Alimentação, 3 Hospedagem, 4 Outros).
-- **Campos do servidor:** qualquer campo além dos quatro acima, como `ownerId`, `status` ou `createdAtUtc`, é recusado com `400`.
-- **Edição:** o `PUT` envia o rascunho completo. Só o dono edita, e só em `Draft`. Reembolso fora do escopo responde `404`; visível mas de outra pessoa, `403`; fora de `Draft`, `409`. Se nada mudar, responde `200` sem gravar histórico.
-- **Visibilidade:** as roles acumulam e o resultado é a união dos escopos. Employee vê os próprios; Approver, os `Submitted`; Finance, os `Approved` e `Paid`; Auditor, todos. Admin sem outra role não tem acesso (`403`). O filtro é aplicado na consulta ao banco, e um reembolso fora do escopo responde `404`.
-- **Envio:** só o dono envia, e só em `Draft`. Reembolso fora do escopo responde `404`; visível mas de outra pessoa, `403`; fora de `Draft` ou já enviado, `409`. O estado é usado como token de concorrência: se duas operações alterarem o mesmo reembolso ao mesmo tempo, a segunda responde `409` e não grava histórico.
-- **Aprovação e reprovação:** só um Approver que não é o dono decide, e só em `Submitted`. A reprovação exige o corpo `{ "justification": "..." }`, com 10 a 500 caracteres; justificativa ausente, curta, longa ou campos extras respondem `400`. O dono, mesmo tendo a role Approver, recebe `403`. Um reembolso recebe uma única decisão: aprovar ou reprovar de novo, ou decidir um reembolso `Approved`, `Rejected` ou `Paid`, responde `409` sem gravar histórico.
-- **Matriz de acesso:** a decisão de role, propriedade e estado fica na camada de serviço (`ExpenseAccessPolicy`), além do `[Authorize]`. A ordem é: fora do escopo de leitura, `404`; sem a role da operação ou regra de propriedade violada, `403`; estado incompatível, `409`. Na aprovação, na reprovação e no pagamento, todo reembolso que já saiu de `Draft` é alcançado por quem tem a role da operação (Approver ou Finance), mesmo fora do escopo de leitura: assim, decidir de novo um reembolso já decidido, ou pagar um reembolso que não está em `Approved`, responde `409`, e não `404`. Rascunhos de outras pessoas continuam respondendo `404`. Ninguém aprova, reprova ou paga o próprio reembolso, mesmo acumulando roles; o Auditor não altera dados.
-- **Pagamento:** só o Finance que não é o dono paga, e só em `Approved`. O pagamento é simulado: grava um `PaymentRecord` com o ator e o instante definidos pelo servidor, no máximo um por reembolso. Pagar um reembolso fora de `Approved` (`Submitted`, `Rejected` ou já `Paid`) responde `409`. Estado, histórico `Paid` e `PaymentRecord` são salvos em um único `SaveChangesAsync`: se a gravação falhar, nada muda.
-- **Histórico:** a criação grava a ação `Created`, cada edição grava `Updated`, o envio grava `Submitted`, a aprovação grava `Approved`, a reprovação grava `Rejected` com a justificativa no campo `Justification` e o pagamento grava `Paid`. Cada registro traz ação, ator, instante UTC e estados anterior e posterior. A edição registra as alterações no campo `Changes` no formato `campo: antes -> depois` (por exemplo `amount: 85.50 -> 171.00; categoryId: 1 -> null`). A alteração e o histórico são salvos na mesma operação.
+```json
+{
+  "id": "19a93b67-8981-453e-83e3-a0c2bf070ba0",
+  "ownerId": "e6e5ee2f-5c7e-4428-b0fd-ff6a7536b13f",
+  "description": "Táxi do aeroporto ao hotel",
+  "amount": 85.50,
+  "expenseDate": "2026-09-20",
+  "categoryId": 1,
+  "categoryName": "Transporte",
+  "status": "Draft",
+  "createdAtUtc": "2026-10-11T09:59:38.3043027Z",
+  "updatedAtUtc": "2026-10-11T09:59:38.3043027Z"
+}
+```
+
+As rotas de ação e de consulta devolvem o reembolso no mesmo formato. A reprovação recebe `{ "justification": "..." }`; aprovar, enviar e pagar não têm corpo.
+
+</details>
+
+<details>
+<summary><b>Exemplo: histórico</b></summary>
+
+```json
+[
+  { "action": "Created",   "previousStatus": null,        "newStatus": "Draft",     "changes": null },
+  { "action": "Updated",   "previousStatus": "Draft",     "newStatus": "Draft",     "changes": "amount: 85.50 -> 171.00" },
+  { "action": "Submitted", "previousStatus": "Draft",     "newStatus": "Submitted", "changes": null },
+  { "action": "Approved",  "previousStatus": "Submitted", "newStatus": "Approved",  "changes": null },
+  { "action": "Paid",      "previousStatus": "Approved",  "newStatus": "Paid",      "changes": null }
+]
+```
+
+Cada registro também traz `actorId`, `occurredAtUtc` (UTC) e `justification` (preenchida na reprovação). Os campos foram resumidos acima para facilitar a leitura.
+
+</details>
+
+## Regras de acesso
+
+As roles acumulam: quem tem várias recebe a união das permissões, mas **ninguém aprova ou paga o próprio reembolso**. Criar, editar e enviar exigem a role `Employee`. As decisões de propriedade e estado ficam na camada de serviço, não apenas no `[Authorize]`.
+
+| Perfil | Enxerga (listagem, detalhe e histórico) |
+|---|---|
+| Employee | Os próprios reembolsos |
+| Approver | Os `Submitted` |
+| Finance | Os `Approved` e `Paid` |
+| Auditor | Todos |
+| Admin sem outra role | Nenhum (`403`) |
+
+O filtro é aplicado na consulta ao banco, antes de materializar os dados. Um reembolso fora do escopo responde `404`, o que isola os dados de um Employee dos demais.
+
+**Ordem das respostas:** sem token, `401` → sem a role da rota, `403` → fora do escopo, `404` → proprietário em operação proibida, `403` → estado incompatível, `409`.
+
+Na aprovação, na reprovação e no pagamento, os reembolsos que já saíram de `Draft` também são alcançados por quem tem a role da operação. Assim, decidir de novo um reembolso já decidido responde `409`, e não `404`.
+
+## Respostas de erro
+
+Todos os erros usam `ProblemDetails`.
+
+| Status | Quando |
+|:---:|---|
+| `400` | Entrada inválida, campo não permitido, role desconhecida ou remoção da própria role Admin |
+| `401` | Sem token, token inválido, expirado ou anterior a uma troca de roles; credenciais erradas no login |
+| `403` | Sem a role exigida ou violando a regra de propriedade |
+| `404` | Recurso inexistente ou fora do escopo de leitura |
+| `409` | Transição de estado incompatível ou repetida |
+
+<details>
+<summary><b>Exemplo de erro</b></summary>
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+  "title": "O estado atual do reembolso não permite esta operação.",
+  "status": 409,
+  "traceId": "00-..."
+}
+```
+
+</details>
 
 ## Testes
 
 ```shell
-dotnet test ./sources/ExpenseHub.slnx
+dotnet test ./sources/ExpenseHub.slnx   # 147 testes unitários
+bash scripts/e2e.sh                     # 75 verificações de ponta a ponta
 ```
 
-Os testes unitários ficam em `sources/ExpenseHub.UnitTests` e rodam sem banco, rede ou serviço externo.
+**Testes unitários.** Ficam em `sources/ExpenseHub.UnitTests` e rodam sem banco, rede ou serviço externo. Eles testam as regras do domínio: transições de estado, combinação de role, propriedade e estado, visibilidade por perfil, decisões, pagamento, histórico, validação dos dados de entrada e troca de roles.
 
-### Roteiro de ponta a ponta
+**Roteiro de ponta a ponta.** O `scripts/e2e.sh` sobe a API com banco e senhas temporários, percorre os casos negativos obrigatórios da matriz de autorização e o fluxo completo, e desliga a API no fim. Requer bash e curl (no Windows, o Git Bash). É uma evidência complementar e não substitui os testes unitários.
 
-Como evidência do fluxo completo, `scripts/e2e.sh` sobe a API com um banco SQLite e senhas temporários, executa 75 verificações de status HTTP e desliga a API no fim. Ele cobre os casos negativos obrigatórios da matriz de autorização, as validações, o fluxo `Draft` → `Submitted` → `Approved` → `Paid`, a reprovação, o histórico, a listagem por perfil e o novo login após troca de roles. O banco de desenvolvimento não é usado.
+## Issues e pull requests
 
-```shell
-bash scripts/e2e.sh
-```
+Cada issue foi implementada em uma branch própria e integrada por pull request, com o score do workflow `code-quality` registrado (100/100 em todos).
 
-Requer bash e curl (no Windows, use o Git Bash). O roteiro termina com código `0` quando todas as verificações passam. Ele é complementar: não substitui os testes unitários.
+| Issue | PR | Responsável |
+|---|:---:|---|
+| I01 — Fundação da solução e Entity Framework Core | [#1](https://github.com/RafaelGbm/CP2_Recass/pull/1) | Rafael |
+| I02 — Identity, Admin e autenticação | [#2](https://github.com/RafaelGbm/CP2_Recass/pull/2) | Rafael |
+| I03 — Cadastro HTTP e gerenciamento de roles | [#3](https://github.com/RafaelGbm/CP2_Recass/pull/3) | Rafael |
+| Ajustes de conformidade das issues I01 a I03 | [#4](https://github.com/RafaelGbm/CP2_Recass/pull/4) | Rafael |
+| I04 — Criar e editar rascunho | [#5](https://github.com/RafaelGbm/CP2_Recass/pull/5) | Vinícius |
+| I05 — Enviar, listar e consultar | [#6](https://github.com/RafaelGbm/CP2_Recass/pull/6) | Vinícius |
+| I06 — Ownership e matriz de acesso | [#7](https://github.com/RafaelGbm/CP2_Recass/pull/7) | Vinícius |
+| I07 — Aprovar e reprovar com justificativa | [#9](https://github.com/RafaelGbm/CP2_Recass/pull/9) | Rafael |
+| I08 — Pagamento e histórico | [#8](https://github.com/RafaelGbm/CP2_Recass/pull/8) | Vinícius |
+| I09 — Testes unitários | em cada PR | Ambos |
+| I10 — Qualidade de código | em cada PR | Ambos |
 
-## Processo de desenvolvimento
+As decisões tomadas onde o contrato não era explícito estão registradas na descrição de cada pull request.
 
-Cada issue do backlog central é implementada em uma branch própria (por exemplo `i03-user-roles`) e integrada por pull request, que cita a issue como `Racass/checkpoint-csharpracass-expensehub#N` e passa pelo workflow `code-quality`. O processo completo está em [PROCESSO-GITHUB.md](docs/PROCESSO-GITHUB.md).
-
-## Documentação do checkpoint
+<details>
+<summary><b>Documentação do checkpoint</b></summary>
 
 - [Enunciado](docs/ENUNCIADO.md)
 - [Requisitos e contratos](docs/REQUISITOS.md)
@@ -256,3 +337,5 @@ Cada issue do backlog central é implementada em uma branch própria (por exempl
 - [Processo no GitHub](docs/PROCESSO-GITHUB.md)
 - [Uso de Inteligência Artificial](docs/USO-DE-IA.md)
 - [Regras do pipeline de qualidade](docs/code-quality-rules.md)
+
+</details>
